@@ -9,7 +9,6 @@ does not fire multiple actions.
 """
 from __future__ import annotations
 
-import time
 from collections import deque
 from typing import Callable, Deque, List, Optional
 
@@ -82,6 +81,14 @@ class GestureRecognizer:
 
     def process(self, frame: HandFrame) -> List[str]:
         """Feed one frame; return list of gestures fired this frame."""
+        # If there's a large time gap since the last frame, the hand was lost.
+        # Clear motion history so we don't produce a phantom swipe when it
+        # re-appears at a very different position.
+        if self._history:
+            gap = frame.timestamp - self._history[-1].timestamp
+            if gap > 0.3:
+                self._history.clear()
+                self._current_pose = None
         self._history.append(frame)
         fired: List[str] = []
 
@@ -138,11 +145,13 @@ class GestureRecognizer:
         window.reverse()
         start = window[0].palm_position
         end = window[-1].palm_position
+        dt = max(1e-3, window[-1].timestamp - window[0].timestamp)
         dx = end[0] - start[0]
         dy = end[1] - start[1]
-        # Average speed of the palm across the window
-        vx = window[-1].palm_velocity[0]
-        vy = window[-1].palm_velocity[1]
+        # Use displacement / dt as robust average velocity (less noisy than
+        # the SDK's instantaneous palm_velocity on a single frame).
+        vx = dx / dt
+        vy = dy / dt
 
         abs_dx, abs_dy = abs(dx), abs(dy)
         abs_vx, abs_vy = abs(vx), abs(vy)

@@ -14,9 +14,9 @@ import logging
 import queue
 import time
 from pathlib import Path
-from typing import Callable, Dict, Optional
-
 import customtkinter as ctk
+
+from typing import Dict
 
 from .action_executor import ActionExecutor
 from .config_manager import ConfigManager
@@ -180,6 +180,18 @@ class GestureApp(ctk.CTk):
         self.cool_slider.grid(row=2, column=1, padx=(0, 12), pady=12, sticky="ew")
         self.cool_val = ctk.CTkLabel(tune, text=f"{int(self.cool_slider.get())}", width=42)
         self.cool_val.grid(row=2, column=2, padx=(0, 20), pady=12)
+
+        ctk.CTkLabel(tune, text="Sensor mount", font=ctk.CTkFont(size=13)).grid(
+            row=3, column=0, padx=(20, 12), pady=12, sticky="w")
+        self.mount_var = ctk.StringVar(
+            value=self.config_mgr.data.get("mount_orientation", "desktop")
+        )
+        ctk.CTkSegmentedButton(
+            tune, values=["desktop", "screen_top"], variable=self.mount_var,
+            command=self._on_mount_change,
+        ).grid(row=3, column=1, padx=(0, 12), pady=12, sticky="w")
+        ctk.CTkLabel(tune, text="hand", text_color=("#999", "#777"),
+                     font=ctk.CTkFont(size=11)).grid(row=3, column=2, padx=(0, 20), pady=12)
 
         # Bindings + Log tabs
         self.tabs = ctk.CTkTabview(main, corner_radius=12)
@@ -361,6 +373,11 @@ class GestureApp(ctk.CTk):
         self.cool_val.configure(text=str(ms))
         self.recognizer.cooldown_ms = ms
         self.config_mgr.save()
+
+    def _on_mount_change(self, value: str) -> None:
+        self.config_mgr.set("mount_orientation", value)
+        self.config_mgr.save()
+        self._append_log(f"[info] Mount orientation → {value}")
 
     def _reset_config(self) -> None:
         self.config_mgr.reset()

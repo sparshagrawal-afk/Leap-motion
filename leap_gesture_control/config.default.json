@@ -1,6 +1,7 @@
 {
   "active_mode": "mouse",
   "hand_preference": "right",
+  "mount_orientation": "desktop",
   "sensitivity": 1.2,
   "smoothing": 0.35,
   "gesture_cooldown_ms": 450,

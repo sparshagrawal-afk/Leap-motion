@@ -54,6 +54,15 @@ Windows users: no extra step. macOS users: grant **Accessibility** permission to
 
 ---
 
+## Sensor mounting orientation
+
+The **Sensor mount** control in the tunables card decides how palm coordinates map to your screen when using **Mouse mode**:
+
+- **`desktop`** (default) — sensor is lying flat on the desk, camera looking up. Move your hand left/right and forward/back (parallel to the desk). `palm x → screen x`, `-palm z → screen y`.
+- **`screen_top`** — sensor is clipped to the top of your monitor, camera facing the user. Move your hand left/right and up/down (parallel to the screen). `palm x → screen x`, `palm y → screen y`.
+
+Change it any time — no restart needed.
+
 ## Gestures
 
 | Gesture             | How to make it                                             |

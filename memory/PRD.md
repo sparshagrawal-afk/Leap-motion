@@ -46,11 +46,19 @@ leap_gesture_control/
   - **Custom**: user-editable, defaults include undo/redo/copy/paste/tab switching.
 - ✅ Cursor movement with sensitivity + smoothing sliders and screen-size auto-detection.
 - ✅ Configurable action strings: `media_*`, `volume_*`, `key:*`, `hotkey:*`, `mouse:*`, `text:*`.
-- ✅ Minimal-clean customtkinter GUI: sidebar (mode + start/stop), status card (tracker/hand/FPS/last gesture/last action), tunables card (sensitivity/smoothing/cooldown sliders), Bindings tab (per-mode editor with Test button), Activity Log tab, simulator controls (only when running mock).
+- ✅ Minimal-clean customtkinter GUI: sidebar (mode + start/stop), status card (tracker/hand/FPS/last gesture/last action), tunables card (sensitivity/smoothing/cooldown sliders + sensor-mount toggle), Bindings tab (per-mode editor with Test button), Activity Log tab, simulator controls (only when running mock).
 - ✅ Autosave on every UI change; reset-to-defaults button.
 - ✅ Headless mode (`main.py --headless`) for background use with no window.
 - ✅ Simulator mode (`main.py --mock`) — full app without hardware.
-- ✅ Test suite: **24/24 passing** — recognizer poses/swipes/cooldown, config save/load/reset/deletion, executor binding parsing, and a full MockTracker → recognizer → mode → executor e2e loop.
+- ✅ Test suite: **28/28 passing** — recognizer poses/swipes/cooldown, config save/load/reset/deletion, executor binding parsing, and a full MockTracker → recognizer → mode → executor e2e loop.
+
+## Quality pass (2026-01-27)
+- ✅ Swipe detection now uses average velocity from displacement/time (more robust than SDK's instantaneous per-frame velocity).
+- ✅ Stale-history reset: if the tracked hand disappears for >300ms, motion history is cleared so no phantom swipe fires when the hand re-enters at a different location.
+- ✅ Mouse mode silently ignores fires of the configured cursor pose — no more "no binding" log spam when the user simply points.
+- ✅ New `mount_orientation` config (`desktop` | `screen_top`) with UI toggle; picks the correct axis-to-screen mapping for either desk-mounted or monitor-clipped sensors.
+- ✅ Added 4 new tests covering the four improvements above.
+- ✅ Unused imports cleaned up; codebase lints clean under ruff.
 
 ## Test verification
 - `pytest tests/ -q` → 24 passed.

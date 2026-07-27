@@ -65,15 +65,25 @@ class ModeController:
             self._smooth_xy = None
             return
 
-        # Map palm x/z (Leap coords) to screen x/y.
+        # Map palm position (Leap coords) to screen x/y based on how the
+        # sensor is physically mounted:
+        #  * "desktop"     — sensor flat on the desk, camera facing up. The
+        #                    user's hand moves in the horizontal x/z plane, so
+        #                    palm x → screen x and (-palm z) → screen y.
+        #  * "screen_top"  — sensor clipped to top of monitor facing the user.
+        #                    Hand moves in the x/y plane, so palm x → screen x
+        #                    and palm y → screen y.
         px, py, pz = frame.palm_position
-        # Leap coordinate system: x right, y up, z forward (toward user negative).
-        # We map palm horizontal x and forward/back z to screen x/y.
         sensitivity = float(self.config.data.get("sensitivity", 1.0))
         smoothing = float(self.config.data.get("smoothing", 0.3))
-        # Working volume centered above device.
-        norm_x = max(-1.0, min(1.0, (px / (250.0 / sensitivity))))
-        norm_y = max(-1.0, min(1.0, (-pz / (200.0 / sensitivity))))
+        orientation = self.config.data.get("mount_orientation", "desktop")
+        if orientation == "screen_top":
+            # palm y is measured from the sensor; center it around ~200 mm.
+            axis_x, axis_y = px, (py - 200.0)
+        else:  # desktop
+            axis_x, axis_y = px, -pz
+        norm_x = max(-1.0, min(1.0, axis_x / (250.0 / sensitivity)))
+        norm_y = max(-1.0, min(1.0, axis_y / (200.0 / sensitivity)))
         sx = (norm_x * 0.5 + 0.5) * self._screen_w
         sy = (norm_y * 0.5 + 0.5) * self._screen_h
         if self._smooth_xy is None:
@@ -92,11 +102,15 @@ class ModeController:
         modes = self.config.data.get("modes", {})
         mode_cfg = modes.get(active, {})
         if not mode_cfg.get("enabled", True):
-            self._emit(gesture, "")
-            return
+            return  # silent: mode disabled
 
-        # Mouse mode has its own action mapping (click gestures)
+        # Mouse mode has its own action mapping (click gestures).
+        # The cursor pose (e.g. `point`) is the *neutral* state used to move
+        # the pointer; it should never fire as an action event and should not
+        # spam the activity log with "no binding".
         if active == "mouse":
+            if gesture == mode_cfg.get("cursor_gesture", "point"):
+                return
             action = self._mouse_mode_action(gesture, mode_cfg)
         else:
             action = (mode_cfg.get("bindings") or {}).get(gesture, "")
