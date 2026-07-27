@@ -1,0 +1,158 @@
+"""Gesture recognizer: turns a stream of HandFrames into discrete gesture events.
+
+Recognized gestures:
+  - pose: point, open_palm, fist, thumbs_up, two_fingers, pinch, two_fingers_pinch
+  - motion: swipe_left, swipe_right, swipe_up, swipe_down
+
+Discrete gestures debounce via a cooldown window so a single physical motion
+does not fire multiple actions.
+"""
+from __future__ import annotations
+
+import time
+from collections import deque
+from typing import Callable, Deque, List, Optional
+
+from .hand_frame import HandFrame
+
+# Pose gestures are fired once when a stable pose is held for >= HOLD_MS.
+POSE_HOLD_MS = 180
+# Motion gestures use velocity + displacement over a short window.
+MOTION_WINDOW_S = 0.35
+MIN_SWIPE_DISPLACEMENT_MM = 90.0
+
+
+def _classify_pose(frame: HandFrame, pinch_threshold: float) -> Optional[str]:
+    extended = set(frame.extended_fingers())
+    pinch = frame.pinch_strength
+    grab = frame.grab_strength
+
+    # Pinch variants first (they can overlap with pose)
+    if pinch >= pinch_threshold:
+        if extended >= {"middle"} and "index" not in extended:
+            return "two_fingers_pinch"
+        return "pinch"
+
+    if grab >= 0.85 and not extended:
+        return "fist"
+    if extended == {"index"}:
+        return "point"
+    if extended == {"index", "middle"}:
+        return "two_fingers"
+    if extended == {"thumb"}:
+        return "thumbs_up"
+    if extended >= {"thumb", "index", "middle", "ring", "pinky"}:
+        return "open_palm"
+    return None
+
+
+class GestureRecognizer:
+    """Stateful recognizer. Feed frames in, receive gesture events out."""
+
+    ALL_GESTURES = [
+        "point", "open_palm", "fist", "thumbs_up", "two_fingers",
+        "pinch", "two_fingers_pinch",
+        "swipe_left", "swipe_right", "swipe_up", "swipe_down",
+        "fist_move",
+    ]
+
+    def __init__(
+        self,
+        cooldown_ms: int = 450,
+        swipe_min_velocity: float = 550.0,
+        pinch_threshold: float = 0.85,
+    ):
+        self.cooldown_ms = cooldown_ms
+        self.swipe_min_velocity = swipe_min_velocity
+        self.pinch_threshold = pinch_threshold
+        self._history: Deque[HandFrame] = deque(maxlen=48)
+        self._last_gesture_time: dict[str, float] = {}
+        self._current_pose: Optional[str] = None
+        self._pose_started_at: float = 0.0
+        self._listeners: List[Callable[[str, HandFrame], None]] = []
+
+    # ---------- Public API ----------
+    def on_gesture(self, cb: Callable[[str, HandFrame], None]) -> None:
+        self._listeners.append(cb)
+
+    def reset(self) -> None:
+        self._history.clear()
+        self._last_gesture_time.clear()
+        self._current_pose = None
+
+    def process(self, frame: HandFrame) -> List[str]:
+        """Feed one frame; return list of gestures fired this frame."""
+        self._history.append(frame)
+        fired: List[str] = []
+
+        # -- pose detection --
+        pose = _classify_pose(frame, self.pinch_threshold)
+        now = frame.timestamp
+        if pose != self._current_pose:
+            self._current_pose = pose
+            self._pose_started_at = now
+        elif pose is not None:
+            held_ms = (now - self._pose_started_at) * 1000.0
+            if held_ms >= POSE_HOLD_MS and self._can_fire(pose, now):
+                self._mark_fired(pose, now)
+                fired.append(pose)
+
+        # -- motion (swipe) detection --
+        swipe = self._detect_swipe(now)
+        if swipe and self._can_fire(swipe, now):
+            self._mark_fired(swipe, now)
+            fired.append(swipe)
+
+        for g in fired:
+            for cb in self._listeners:
+                try:
+                    cb(g, frame)
+                except Exception:  # noqa: BLE001
+                    pass
+        return fired
+
+    # ---------- internals ----------
+    def _can_fire(self, gesture: str, now: float) -> bool:
+        last = self._last_gesture_time.get(gesture, 0.0)
+        return (now - last) * 1000.0 >= self.cooldown_ms
+
+    def _mark_fired(self, gesture: str, now: float) -> None:
+        self._last_gesture_time[gesture] = now
+        # Also cool down all swipes together so one motion fires once.
+        if gesture.startswith("swipe_"):
+            for g in ("swipe_left", "swipe_right", "swipe_up", "swipe_down"):
+                self._last_gesture_time[g] = now
+
+    def _detect_swipe(self, now: float) -> Optional[str]:
+        if len(self._history) < 4:
+            return None
+        # collect frames inside the motion window
+        window: List[HandFrame] = []
+        for f in reversed(self._history):
+            if now - f.timestamp <= MOTION_WINDOW_S:
+                window.append(f)
+            else:
+                break
+        if len(window) < 4:
+            return None
+        window.reverse()
+        start = window[0].palm_position
+        end = window[-1].palm_position
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        # Average speed of the palm across the window
+        vx = window[-1].palm_velocity[0]
+        vy = window[-1].palm_velocity[1]
+
+        abs_dx, abs_dy = abs(dx), abs(dy)
+        abs_vx, abs_vy = abs(vx), abs(vy)
+
+        # Require a real displacement, not just a jitter spike.
+        if max(abs_dx, abs_dy) < MIN_SWIPE_DISPLACEMENT_MM:
+            return None
+        # Dominant axis must exceed threshold velocity.
+        if abs_dx > abs_dy * 1.4 and abs_vx >= self.swipe_min_velocity:
+            return "swipe_right" if dx > 0 else "swipe_left"
+        if abs_dy > abs_dx * 1.4 and abs_vy >= self.swipe_min_velocity:
+            return "swipe_up" if dy > 0 else "swipe_down"
+        return None

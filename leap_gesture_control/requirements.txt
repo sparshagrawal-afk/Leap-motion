@@ -1,0 +1,9 @@
+customtkinter>=5.2.2
+pyautogui>=0.9.54
+pynput>=1.7.7
+# Ultraleap Gemini SDK Python bindings must be installed separately from source:
+#   git clone https://github.com/ultraleap/leapc-python-bindings.git
+#   cd leapc-python-bindings
+#   pip install -r requirements.txt
+#   pip install -e leapc-python-api
+# Requires Ultraleap Gemini Hand Tracking Software installed on the host machine.
