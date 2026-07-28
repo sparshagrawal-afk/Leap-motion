@@ -1,6 +1,6 @@
 # Leap Gesture Control
 
-A minimal-clean desktop application that turns your **Ultraleap Leap Motion 2** hand tracking into system-wide actions: mouse control, media control, presentation slides, and fully customisable keyboard shortcuts.
+A minimal-clean desktop app that turns your **Ultraleap Leap Motion 2** into a hands-free trackpad-gesture layer for macOS. Wave your hand — trigger Mission Control, App Exposé, switch Spaces, launch apps, and scroll.
 
 Built with Python + `customtkinter` + the official **Ultraleap Gemini Python bindings** (`leapc-python-bindings`).
 
@@ -8,28 +8,21 @@ Built with Python + `customtkinter` + the official **Ultraleap Gemini Python bin
 
 ## Features
 
-- 🖱️ **Mouse mode** — pointing pose moves the cursor, pinch = left-click, two-finger pinch = right-click. Cursor smoothing + adjustable sensitivity.
-- 🎵 **Media mode** — swipe left/right for previous/next track, swipe up/down for volume, pinch to play/pause.
-- 📽️ **Presentation mode** — swipe right/left to advance slides, pinch to toggle full-screen.
-- 🎛️ **Custom mode** — bind any recognised gesture to any keystroke, hotkey combo, media command, or mouse action from the GUI.
-- 🍎 **macOS mode** — trackpad-style gestures for macOS:
-   - `point` → move cursor · `pinch` → left click · `two_fingers_pinch` → right click
-   - **Two-finger scroll** (index + middle): continuous, direction follows palm motion, natural scroll by default
-   - `open_palm` **swipe up** → Mission Control (Ctrl+↑)
-   - `open_palm` **swipe down** → App Exposé (Ctrl+↓)
-   - `open_palm` **swipe left/right** → switch between Spaces (Ctrl+←/→)
-   - `fist` → Launchpad (F4)
-   - All bindings editable from the Bindings tab.
-- 🧠 Robust gesture recognizer (pose hold + velocity/displacement swipes + per-gesture cooldown) so a single motion never fires twice.
-- 🕹️ **Built-in simulator** — the app works without hardware for testing/demoing. Just run `python main.py --mock` and drive gestures from the "Activity Log" tab.
+- 🖱️ **Two-finger scroll** — extend index + middle finger, move your hand; the OS scrolls in that direction. Natural (macOS default) or traditional direction, sensitivity-tunable.
+- 🚦 **Mission Control** — open-palm swipe **up** (Ctrl+↑)
+- 📋 **App Exposé** — open-palm swipe **down** (Ctrl+↓)
+- 🔄 **Switch Spaces** — open-palm swipe **left / right** (Ctrl+←/→)
+- 🚀 **Launchpad** — close your fist (F4)
+- 🎚️ **Master switch** — pause all OS actions in one click while the tracker keeps running.
+- 🕹️ **Simulator mode** — the app works without hardware for demos: `python main.py --mock`.
 - 📝 Config is a plain JSON file; every change in the UI saves automatically.
 
 ---
 
-## Prerequisites (real-hardware mode)
+## Prerequisites
 
 1. **Ultraleap Leap Motion 2** (or any Ultraleap hand-tracking camera).
-2. **Ultraleap Gemini Hand Tracking Software** installed on your machine — <https://developer.leapmotion.com/tracking-software-download>
+2. **Ultraleap Gemini Hand Tracking Software** — <https://leap2.ultraleap.com/downloads/leap-motion-controller-2/>
 3. **Python 3.10+**
 4. **Ultraleap Python bindings** (`leapc-python-bindings`):
    ```bash
@@ -38,108 +31,74 @@ Built with Python + `customtkinter` + the official **Ultraleap Gemini Python bin
    pip install -r requirements.txt
    pip install -e leapc-python-api
    ```
-   If your SDK is not in the default location, set `LEAPSDK_INSTALL_LOCATION` before installing.
 
-If any of these are missing, the app automatically falls back to **simulator mode**.
-
-## Install app dependencies
-
-```bash
-cd leap_gesture_control
-pip install -r requirements.txt
-```
+If any of these are missing, the app falls back to **simulator mode**.
 
 ## Run
 
 ```bash
-python main.py                # GUI, real hardware if available
-python main.py --mock         # GUI in simulator mode
-python main.py --headless     # no GUI (runs recognizer + actions in the background)
-python main.py -v             # verbose logs
+cd leap_gesture_control
+pip install -r requirements.txt
+python main.py              # real hardware if available
+python main.py --mock       # simulator (no hardware)
+python main.py --headless   # background service, no GUI
 ```
 
-Windows users: no extra step. macOS users: grant **Accessibility** permission to the terminal/Python interpreter (System Settings → Privacy & Security → Accessibility) so `pyautogui`/`pynput` can move the mouse and send keys. Linux (X11) works out of the box; on Wayland, run in an XWayland session.
+**macOS**: grant **Accessibility** permission to your Terminal/IDE so `pyautogui`/`pynput` can send keystrokes and scroll wheel events. *System Settings → Privacy & Security → Accessibility*.
+
+---
+
+## The GUI
+
+- **Sidebar**: **Start Tracking** button, **Gestures active** master switch (toggles OFF to silence every OS side-effect while the tracker keeps running), **Reset to defaults**.
+- **Status card**: tracker state · tracked hand · FPS · last gesture · last action.
+- **Tunables**: scroll sensitivity, gesture cooldown, sensor mount (`desktop` / `screen_top`), tracked hand (`left` / `right` / `both`).
+- **Bindings tab**: scroll on/off + natural-scroll toggle, and a mapping row for every recognised gesture with a **Test** button next to each.
+- **Activity Log tab**: rolling log of every gesture fired and its resulting action.
+
+---
+
+## Gestures & default bindings
+
+| Gesture | How to make it | Default action |
+| --- | --- | --- |
+| `two_fingers` motion | Extend index + middle, move hand | **Scroll** (natural direction) |
+| `swipe_up+open_palm` | All 5 fingers extended, swipe up | Ctrl+↑ · Mission Control |
+| `swipe_down+open_palm` | All 5, swipe down | Ctrl+↓ · App Exposé |
+| `swipe_left+open_palm` | All 5, swipe left | Ctrl+← · previous Space |
+| `swipe_right+open_palm` | All 5, swipe right | Ctrl+→ · next Space |
+| `fist` | All fingers closed | F4 · Launchpad |
+
+Every binding is editable in the Bindings tab. Binding syntax:
+
+| Prefix | Example | Effect |
+| --- | --- | --- |
+| _(built-in)_ | `media_play_pause` / `media_next` / `volume_up` … | Media keys |
+| `key:` | `key:right`, `key:f4` | Single key |
+| `hotkey:` | `hotkey:ctrl+shift+t` | Key combo |
+| `text:` | `text:hello world` | Type text |
 
 ---
 
 ## Sensor mounting orientation
 
-The **Sensor mount** control in the tunables card decides how palm coordinates map to your screen when using **Mouse mode**:
+Choose from the **Sensor mount** control in the tunables card:
 
-- **`desktop`** (default) — sensor is lying flat on the desk, camera looking up. Move your hand left/right and forward/back (parallel to the desk). `palm x → screen x`, `-palm z → screen y`.
-- **`screen_top`** — sensor is clipped to the top of your monitor, camera facing the user. Move your hand left/right and up/down (parallel to the screen). `palm x → screen x`, `palm y → screen y`.
+- **`desktop`** — sensor flat on the desk facing up. Hand moves in the horizontal x/z plane; scroll direction is `-z` (forward = up).
+- **`screen_top`** — sensor clipped to top of monitor facing the user. Hand moves in the x/y plane; scroll direction is `y` (up = up).
 
-Change it any time — no restart needed.
-
-## Gestures
-
-| Gesture             | How to make it                                             |
-| ------------------- | ---------------------------------------------------------- |
-| `point`             | Only the index finger extended                             |
-| `two_fingers`       | Index + middle finger extended                             |
-| `thumbs_up`         | Only the thumb extended                                    |
-| `open_palm`         | All five fingers extended                                  |
-| `fist`              | All fingers closed (grab strength ≥ 0.85)                  |
-| `pinch`             | Thumb + index tips touching (pinch strength ≥ 0.85)        |
-| `two_fingers_pinch` | Pinch with middle finger extended                          |
-| `swipe_left/right`  | Horizontal palm motion (≥ 90 mm & ≥ 550 mm/s)              |
-| `swipe_up/down`     | Vertical palm motion                                       |
-
-## Default action bindings
-
-**Media mode**
-- `swipe_left` → previous track
-- `swipe_right` → next track
-- `swipe_up` → volume up
-- `swipe_down` → volume down
-- `pinch` → play / pause
-
-**Presentation mode**
-- `swipe_right` → Right arrow (next slide)
-- `swipe_left` → Left arrow (previous slide)
-- `swipe_up` → Escape (exit fullscreen)
-- `pinch` → Space (start / pause presentation)
-
-**Custom mode** (fully user-editable)
-- `swipe_left` → Ctrl+Z
-- `swipe_right` → Ctrl+Y
-- `pinch` → Enter
-- `thumbs_up` → Ctrl+C
-- `two_fingers` → Ctrl+V
-
-All bindings can be changed in the **Bindings** tab. Use the **Test** button next to any binding to fire the action without gesturing.
-
-## Binding syntax
-
-You can type any custom string in the binding combobox:
-
-| Prefix       | Example                | Effect                          |
-| ------------ | ---------------------- | ------------------------------- |
-| _(built-in)_ | `media_play_pause`     | Media key play/pause            |
-| _(built-in)_ | `media_next`           | Media key next                  |
-| _(built-in)_ | `media_previous`       | Media key previous              |
-| _(built-in)_ | `volume_up` / `_down`  | Media key volume                |
-| `key:`       | `key:right`            | Press a single key              |
-| `hotkey:`    | `hotkey:ctrl+shift+t`  | Press a key combo               |
-| `mouse:`     | `mouse:left_click`     | Left / right / double click     |
-| `text:`      | `text:hello world`     | Type the given text             |
+Change any time — no restart.
 
 ---
 
-## Development / tests
-
-The recognizer and config manager have zero hardware dependencies. Run:
+## Tests
 
 ```bash
 pip install pytest
 pytest -q
 ```
 
-Included suites:
-- `tests/test_gesture_recognizer.py` — pose + swipe detection, cooldown behaviour.
-- `tests/test_config_manager.py`     — defaults, deep-merged user overrides, save/reset.
-- `tests/test_action_executor.py`    — binding parsing (dry-run).
-- `tests/test_end_to_end_mock.py`    — full MockTracker → recognizer → mode → executor loop.
+38 tests covering the recognizer (pose + swipe + cooldown + hand-lost reset + pose-modified swipe emission), config load/save/reset, executor binding parsing, macOS mode dispatch, master switch, and a full mock-tracker → recognizer → mode → executor loop.
 
 ---
 
@@ -147,32 +106,33 @@ Included suites:
 
 ```
 leap_gesture_control/
-├── main.py                       # entry point (GUI / headless / --mock)
-├── config.default.json           # factory defaults
+├── main.py                 # entry point (GUI / --mock / --headless)
+├── config.default.json     # factory defaults
 ├── requirements.txt
+├── README.md
 ├── src/
-│   ├── hand_frame.py             # SDK-agnostic hand data types
-│   ├── leap_tracker.py           # Ultraleap Gemini bindings adapter
-│   ├── mock_tracker.py           # scripted hand-frame producer (no hw)
-│   ├── gesture_recognizer.py     # poses + swipes + cooldown
-│   ├── action_executor.py        # media / key / hotkey / mouse
-│   ├── mode_controller.py        # gesture → binding dispatch + cursor mapping
+│   ├── hand_frame.py       # SDK-agnostic data types
+│   ├── leap_tracker.py     # Ultraleap Gemini adapter
+│   ├── mock_tracker.py     # scripted frames, no hardware
+│   ├── gesture_recognizer.py
+│   ├── action_executor.py  # media / key / hotkey / scroll
+│   ├── mode_controller.py  # scroll + gesture dispatch + master switch
 │   ├── config_manager.py
-│   └── gui.py                    # customtkinter UI
-└── tests/
+│   └── gui.py              # customtkinter UI
+└── tests/                  # 38 pytest tests
 ```
 
 ---
 
 ## Troubleshooting
 
-- **`Ultraleap SDK not detected`** in the app header → install the Gemini Hand Tracking Software **and** `leapc-python-bindings`.  Restart the app.
-- **Cursor doesn’t move** in Mouse mode → make sure your active pose is `point` (only index extended). Increase `sensitivity` and lower `smoothing` if it feels sluggish.
-- **Media keys ignored on Linux** → install `playerctl` and remap the media entries to `hotkey:` shortcuts your desktop understands.
-- **Gestures fire twice** → increase the `gesture_cooldown_ms` slider (default 450 ms).
-
----
+- **App shows "SDK missing"** → install the Gemini tracking software AND `leapc-python-bindings` in the same Python venv you're launching from.
+- **Nothing tracks** → click **Start Tracking**, and check the status card FPS is non-zero. Verify Ultraleap Visualizer still sees your hand.
+- **Only tracks one hand** → change **Tracked hand** in the tunables card to `left`, `right`, or `both`.
+- **Scroll fires too easily / not easily** → move the **Scroll sensitivity** slider (lower = coarser, higher = finer).
+- **Gestures fire twice** → increase **Gesture cooldown (ms)**.
+- **You want to pause without stopping the tracker** → flip the sidebar **Gestures active** switch to off.
 
 ## License
 
-MIT (do whatever you want, no warranty).
+MIT.

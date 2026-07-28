@@ -71,14 +71,12 @@ def test_pinch_pose_does_not_taint_swipe_modifier():
 
 def _write_default_config(tmp_path: Path) -> None:
     (tmp_path / "config.default.json").write_text('''{
-        "active_mode": "macos", "sensitivity": 1.0, "smoothing": 0.0,
+        "active_mode": "macos", "gestures_enabled": true,
+        "sensitivity": 1.0, "smoothing": 0.0,
         "mount_orientation": "desktop", "gesture_cooldown_ms": 200,
         "modes": {
             "macos": {
                 "enabled": true,
-                "cursor_gesture": "point",
-                "click_gesture": "pinch",
-                "right_click_gesture": "two_fingers_pinch",
                 "scroll": {"enabled": true, "natural": true, "sensitivity": 1.0},
                 "bindings": {
                     "swipe_up+open_palm": "hotkey:ctrl+up",
@@ -90,29 +88,6 @@ def _write_default_config(tmp_path: Path) -> None:
             }
         }
     }''')
-
-
-def test_macos_mode_point_moves_cursor(tmp_path):
-    _write_default_config(tmp_path)
-    cfg = ConfigManager(tmp_path)
-    ex = ActionExecutor(dry_run=True)
-    mode = ModeController(cfg, ex)
-    mode._screen_w, mode._screen_h = 1000, 1000
-    moves = []
-    ex.move_cursor = lambda x, y: moves.append((x, y))
-    mode.handle_frame(_frame(0.0, (0.0, 200.0, 0.0), extended={"index": True}))
-    assert moves and abs(moves[-1][0] - 500) < 5 and abs(moves[-1][1] - 500) < 5
-
-
-def test_macos_mode_pinch_left_clicks(tmp_path):
-    _write_default_config(tmp_path)
-    cfg = ConfigManager(tmp_path)
-    ex = ActionExecutor(dry_run=True)
-    mode = ModeController(cfg, ex)
-    events = []
-    mode.on_event(lambda g, a: events.append((g, a)))
-    mode.handle_gesture("pinch", _frame(0.0, (0, 200, 0)))
-    assert ("pinch", "mouse:left_click") in events
 
 
 def test_macos_open_palm_swipe_up_triggers_mission_control(tmp_path):

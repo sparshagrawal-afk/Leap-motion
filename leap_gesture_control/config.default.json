@@ -1,58 +1,14 @@
 {
-  "active_mode": "mouse",
+  "active_mode": "macos",
   "gestures_enabled": true,
   "hand_preference": "right",
   "mount_orientation": "desktop",
-  "sensitivity": 1.2,
-  "smoothing": 0.35,
   "gesture_cooldown_ms": 450,
   "swipe_min_velocity_mm_s": 550,
   "pinch_threshold": 0.85,
-  "start_minimized": false,
   "modes": {
-    "mouse": {
-      "enabled": true,
-      "cursor_gesture": "point",
-      "click_gesture": "pinch",
-      "right_click_gesture": "two_fingers_pinch",
-      "scroll_gesture": "fist_move"
-    },
-    "media": {
-      "enabled": true,
-      "bindings": {
-        "swipe_left": "media_previous",
-        "swipe_right": "media_next",
-        "pinch": "media_play_pause",
-        "swipe_up": "volume_up",
-        "swipe_down": "volume_down"
-      }
-    },
-    "presentation": {
-      "enabled": true,
-      "bindings": {
-        "swipe_right": "key:right",
-        "swipe_left": "key:left",
-        "swipe_up": "key:escape",
-        "pinch": "key:space"
-      }
-    },
-    "custom": {
-      "enabled": true,
-      "bindings": {
-        "swipe_left": "hotkey:ctrl+z",
-        "swipe_right": "hotkey:ctrl+y",
-        "swipe_up": "hotkey:ctrl+shift+tab",
-        "swipe_down": "hotkey:ctrl+tab",
-        "pinch": "key:enter",
-        "thumbs_up": "hotkey:ctrl+c",
-        "two_fingers": "hotkey:ctrl+v"
-      }
-    },
     "macos": {
       "enabled": true,
-      "cursor_gesture": "point",
-      "click_gesture": "pinch",
-      "right_click_gesture": "two_fingers_pinch",
       "scroll": {
         "enabled": true,
         "natural": true,
@@ -63,8 +19,7 @@
         "swipe_down+open_palm": "hotkey:ctrl+down",
         "swipe_left+open_palm": "hotkey:ctrl+left",
         "swipe_right+open_palm": "hotkey:ctrl+right",
-        "fist": "key:f4",
-        "thumbs_up": "hotkey:fn+n"
+        "fist": "key:f4"
       }
     }
   }

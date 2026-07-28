@@ -32,17 +32,8 @@ from .mode_controller import ModeController
 log = logging.getLogger("gesture.gui")
 
 APP_TITLE = "Leap Gesture Control"
-MODES = ["mouse", "media", "presentation", "custom", "macos"]
-MODE_LABELS = {
-    "mouse": "Mouse",
-    "media": "Media",
-    "presentation": "Presentation",
-    "custom": "Custom",
-    "macos": "macOS",
-}
 GESTURES = [
-    "point", "open_palm", "fist", "thumbs_up", "two_fingers",
-    "pinch", "two_fingers_pinch",
+    "open_palm", "fist", "thumbs_up", "two_fingers",
     "swipe_left", "swipe_right", "swipe_up", "swipe_down",
     "swipe_left+open_palm", "swipe_right+open_palm",
     "swipe_up+open_palm", "swipe_down+open_palm",
@@ -53,10 +44,11 @@ ACTION_PRESETS = [
     "media_play_pause", "media_next", "media_previous",
     "volume_up", "volume_down", "volume_mute",
     "key:right", "key:left", "key:up", "key:down",
-    "key:space", "key:enter", "key:escape", "key:tab",
+    "key:space", "key:enter", "key:escape", "key:tab", "key:f4",
+    "hotkey:ctrl+up", "hotkey:ctrl+down",
+    "hotkey:ctrl+left", "hotkey:ctrl+right",
     "hotkey:ctrl+c", "hotkey:ctrl+v", "hotkey:ctrl+z", "hotkey:ctrl+y",
     "hotkey:ctrl+tab", "hotkey:ctrl+shift+tab",
-    "mouse:left_click", "mouse:right_click", "mouse:double_click",
 ]
 
 
@@ -150,28 +142,19 @@ class GestureApp(ctk.CTk):
         ctk.CTkLabel(sidebar, text=APP_TITLE, font=ctk.CTkFont(size=18, weight="bold")).grid(
             row=0, column=0, padx=20, pady=(24, 6), sticky="w"
         )
-        subtitle = "Leap Motion 2 · Ultraleap" + ("  ·  (simulator)" if self.use_mock else "")
+        subtitle = "Leap Motion 2 · macOS gestures" + ("  ·  (simulator)" if self.use_mock else "")
         ctk.CTkLabel(sidebar, text=subtitle, text_color=("#666", "#aaa"),
                      font=ctk.CTkFont(size=11)).grid(row=1, column=0, padx=20, pady=(0, 20), sticky="w")
 
-        ctk.CTkLabel(sidebar, text="MODE", font=ctk.CTkFont(size=11, weight="bold"),
-                     text_color=("#888", "#888")).grid(row=2, column=0, padx=20, pady=(4, 6), sticky="w")
-
-        self.mode_var = ctk.StringVar(value=self.config_mgr.data.get("active_mode", "mouse"))
-        for i, m in enumerate(MODES):
-            btn = ctk.CTkRadioButton(
-                sidebar, text=MODE_LABELS.get(m, m.capitalize()),
-                variable=self.mode_var, value=m,
-                command=self._on_mode_change, font=ctk.CTkFont(size=14),
-            )
-            btn.grid(row=3 + i, column=0, padx=24, pady=6, sticky="w")
+        # Single-mode app — no mode selector needed.
+        self.mode_var = ctk.StringVar(value="macos")
 
         self.toggle_btn = ctk.CTkButton(
             sidebar, text="Start Tracking", height=44,
             font=ctk.CTkFont(size=14, weight="bold"),
             command=self._toggle_tracking,
         )
-        self.toggle_btn.grid(row=3 + len(MODES) + 1, column=0, padx=20, pady=(0, 8), sticky="ew")
+        self.toggle_btn.grid(row=2, column=0, padx=20, pady=(0, 8), sticky="ew")
 
         # Master enable switch — pauses all OS side-effects while keeping the
         # tracker running so the user can still see hand data.
@@ -185,7 +168,7 @@ class GestureApp(ctk.CTk):
             font=ctk.CTkFont(size=13),
         )
         self.gestures_switch.grid(
-            row=3 + len(MODES) + 2, column=0, padx=24, pady=(0, 12), sticky="w"
+            row=3, column=0, padx=24, pady=(0, 12), sticky="w"
         )
 
         self.reset_btn = ctk.CTkButton(
@@ -193,7 +176,7 @@ class GestureApp(ctk.CTk):
             border_width=1, text_color=("#333", "#ddd"),
             command=self._reset_config,
         )
-        self.reset_btn.grid(row=3 + len(MODES) + 3, column=0, padx=20, pady=(0, 20), sticky="ew")
+        self.reset_btn.grid(row=4, column=0, padx=20, pady=(0, 20), sticky="ew")
 
         # Main area ----------------------------------------------------------
         main = ctk.CTkFrame(self, corner_radius=0, fg_color=("#f6f7f9", "#1a1a1a"))
@@ -219,52 +202,46 @@ class GestureApp(ctk.CTk):
         tune.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
         tune.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(tune, text="Cursor sensitivity", font=ctk.CTkFont(size=13)).grid(
+        ctk.CTkLabel(tune, text="Scroll sensitivity", font=ctk.CTkFont(size=13)).grid(
             row=0, column=0, padx=(20, 12), pady=12, sticky="w")
-        self.sens_slider = ctk.CTkSlider(tune, from_=0.4, to=2.5, number_of_steps=42,
-                                         command=self._on_sensitivity_change)
-        self.sens_slider.set(float(self.config_mgr.data.get("sensitivity", 1.2)))
-        self.sens_slider.grid(row=0, column=1, padx=(0, 12), pady=12, sticky="ew")
-        self.sens_val = ctk.CTkLabel(tune, text=f"{self.sens_slider.get():.2f}", width=42)
-        self.sens_val.grid(row=0, column=2, padx=(0, 20), pady=12)
-
-        ctk.CTkLabel(tune, text="Cursor smoothing", font=ctk.CTkFont(size=13)).grid(
-            row=1, column=0, padx=(20, 12), pady=12, sticky="w")
-        self.smooth_slider = ctk.CTkSlider(tune, from_=0.0, to=0.9, number_of_steps=45,
-                                           command=self._on_smoothing_change)
-        self.smooth_slider.set(float(self.config_mgr.data.get("smoothing", 0.35)))
-        self.smooth_slider.grid(row=1, column=1, padx=(0, 12), pady=12, sticky="ew")
-        self.smooth_val = ctk.CTkLabel(tune, text=f"{self.smooth_slider.get():.2f}", width=42)
-        self.smooth_val.grid(row=1, column=2, padx=(0, 20), pady=12)
+        scroll_cfg = self.config_mgr.data.get("modes", {}).get("macos", {}).get("scroll", {})
+        self.scroll_sens_slider = ctk.CTkSlider(tune, from_=0.3, to=3.0, number_of_steps=54,
+                                                command=self._on_scroll_sensitivity_change)
+        self.scroll_sens_slider.set(float(scroll_cfg.get("sensitivity", 1.0)))
+        self.scroll_sens_slider.grid(row=0, column=1, padx=(0, 12), pady=12, sticky="ew")
+        self.scroll_sens_val = ctk.CTkLabel(
+            tune, text=f"{self.scroll_sens_slider.get():.2f}", width=42
+        )
+        self.scroll_sens_val.grid(row=0, column=2, padx=(0, 20), pady=12)
 
         ctk.CTkLabel(tune, text="Gesture cooldown (ms)", font=ctk.CTkFont(size=13)).grid(
-            row=2, column=0, padx=(20, 12), pady=12, sticky="w")
+            row=1, column=0, padx=(20, 12), pady=12, sticky="w")
         self.cool_slider = ctk.CTkSlider(tune, from_=150, to=1200, number_of_steps=42,
                                          command=self._on_cooldown_change)
         self.cool_slider.set(float(self.config_mgr.data.get("gesture_cooldown_ms", 450)))
-        self.cool_slider.grid(row=2, column=1, padx=(0, 12), pady=12, sticky="ew")
+        self.cool_slider.grid(row=1, column=1, padx=(0, 12), pady=12, sticky="ew")
         self.cool_val = ctk.CTkLabel(tune, text=f"{int(self.cool_slider.get())}", width=42)
-        self.cool_val.grid(row=2, column=2, padx=(0, 20), pady=12)
+        self.cool_val.grid(row=1, column=2, padx=(0, 20), pady=12)
 
         ctk.CTkLabel(tune, text="Sensor mount", font=ctk.CTkFont(size=13)).grid(
-            row=3, column=0, padx=(20, 12), pady=12, sticky="w")
+            row=2, column=0, padx=(20, 12), pady=12, sticky="w")
         self.mount_var = ctk.StringVar(
             value=self.config_mgr.data.get("mount_orientation", "desktop")
         )
         ctk.CTkSegmentedButton(
             tune, values=["desktop", "screen_top"], variable=self.mount_var,
             command=self._on_mount_change,
-        ).grid(row=3, column=1, padx=(0, 12), pady=12, sticky="w")
+        ).grid(row=2, column=1, padx=(0, 12), pady=12, sticky="w")
 
         ctk.CTkLabel(tune, text="Tracked hand", font=ctk.CTkFont(size=13)).grid(
-            row=4, column=0, padx=(20, 12), pady=12, sticky="w")
+            row=3, column=0, padx=(20, 12), pady=12, sticky="w")
         self.hand_var = ctk.StringVar(
             value=self.config_mgr.data.get("hand_preference", "right")
         )
         ctk.CTkSegmentedButton(
             tune, values=["left", "right", "both"], variable=self.hand_var,
             command=self._on_hand_change,
-        ).grid(row=4, column=1, padx=(0, 12), pady=12, sticky="w")
+        ).grid(row=3, column=1, padx=(0, 12), pady=12, sticky="w")
 
         # Bindings + Log tabs
         self.tabs = ctk.CTkTabview(main, corner_radius=12)
@@ -311,49 +288,30 @@ class GestureApp(ctk.CTk):
         active = self.mode_var.get()
         cfg = self.config_mgr.data["modes"].get(active, {})
         row_offset = 0
-        if active in ("mouse", "macos"):
-            # cursor / click gesture rows (shared between mouse-like modes)
-            rows = [
-                ("Cursor pose", "cursor_gesture", ["point", "open_palm"]),
-                ("Left click", "click_gesture", ["pinch", "fist", "thumbs_up"]),
-                ("Right click", "right_click_gesture", ["two_fingers_pinch", "two_fingers", "thumbs_up"]),
-            ]
-            for i, (label, key, choices) in enumerate(rows):
-                ctk.CTkLabel(self.bindings_frame, text=label, anchor="w",
-                             font=ctk.CTkFont(size=13)).grid(row=i, column=0, padx=12, pady=8, sticky="w")
-                var = ctk.StringVar(value=cfg.get(key, choices[0]))
-                combo = ctk.CTkOptionMenu(
-                    self.bindings_frame, variable=var, values=choices,
-                    command=lambda v, k=key: self._set_mouse_field(k, v),
-                    width=200,
-                )
-                combo.grid(row=i, column=1, padx=12, pady=8, sticky="w")
-            row_offset = len(rows)
-            if active == "mouse":
-                return
-            # macOS-only: scroll toggle row
-            scroll_cfg = cfg.get("scroll", {}) or {}
-            ctk.CTkLabel(self.bindings_frame, text="Scroll (two-finger)", anchor="w",
-                         font=ctk.CTkFont(size=13)).grid(
-                row=row_offset, column=0, padx=12, pady=8, sticky="w")
-            self._scroll_enabled_var = ctk.BooleanVar(value=bool(scroll_cfg.get("enabled", True)))
-            ctk.CTkSwitch(self.bindings_frame, text="enabled",
-                          variable=self._scroll_enabled_var,
-                          command=lambda: self._set_scroll_field("enabled", self._scroll_enabled_var.get())
-                          ).grid(row=row_offset, column=1, padx=12, pady=8, sticky="w")
-            row_offset += 1
-            self._scroll_natural_var = ctk.BooleanVar(value=bool(scroll_cfg.get("natural", True)))
-            ctk.CTkLabel(self.bindings_frame, text="Natural scroll", anchor="w",
-                         font=ctk.CTkFont(size=13)).grid(
-                row=row_offset, column=0, padx=12, pady=8, sticky="w")
-            ctk.CTkSwitch(self.bindings_frame, text="on (macOS default)",
-                          variable=self._scroll_natural_var,
-                          command=lambda: self._set_scroll_field("natural", self._scroll_natural_var.get())
-                          ).grid(row=row_offset, column=1, padx=12, pady=8, sticky="w")
-            row_offset += 1
-            ctk.CTkFrame(self.bindings_frame, height=1, fg_color=("#e0e0e0", "#333")).grid(
-                row=row_offset, column=0, columnspan=3, sticky="ew", padx=12, pady=(4, 8))
-            row_offset += 1
+
+        # Scroll toggles at the top.
+        scroll_cfg = cfg.get("scroll", {}) or {}
+        ctk.CTkLabel(self.bindings_frame, text="Scroll (two-finger)", anchor="w",
+                     font=ctk.CTkFont(size=13)).grid(
+            row=row_offset, column=0, padx=12, pady=8, sticky="w")
+        self._scroll_enabled_var = ctk.BooleanVar(value=bool(scroll_cfg.get("enabled", True)))
+        ctk.CTkSwitch(self.bindings_frame, text="enabled",
+                      variable=self._scroll_enabled_var,
+                      command=lambda: self._set_scroll_field("enabled", self._scroll_enabled_var.get())
+                      ).grid(row=row_offset, column=1, padx=12, pady=8, sticky="w")
+        row_offset += 1
+        self._scroll_natural_var = ctk.BooleanVar(value=bool(scroll_cfg.get("natural", True)))
+        ctk.CTkLabel(self.bindings_frame, text="Natural scroll", anchor="w",
+                     font=ctk.CTkFont(size=13)).grid(
+            row=row_offset, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkSwitch(self.bindings_frame, text="on (macOS default)",
+                      variable=self._scroll_natural_var,
+                      command=lambda: self._set_scroll_field("natural", self._scroll_natural_var.get())
+                      ).grid(row=row_offset, column=1, padx=12, pady=8, sticky="w")
+        row_offset += 1
+        ctk.CTkFrame(self.bindings_frame, height=1, fg_color=("#e0e0e0", "#333")).grid(
+            row=row_offset, column=0, columnspan=3, sticky="ew", padx=12, pady=(4, 8))
+        row_offset += 1
 
         bindings: Dict[str, str] = cfg.get("bindings", {}) or {}
         for i, g in enumerate(GESTURES):
@@ -398,7 +356,7 @@ class GestureApp(ctk.CTk):
             controls.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 6))
             ctk.CTkLabel(controls, text="Simulator:",
                          font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=(4, 8))
-            for pose in ["point", "pinch", "fist", "open_palm", "two_fingers", "thumbs_up",
+            for pose in ["fist", "open_palm", "two_fingers", "thumbs_up",
                          "swipe_left", "swipe_right", "swipe_up", "swipe_down"]:
                 ctk.CTkButton(controls, text=pose, width=110, height=28,
                               command=lambda p=pose: self._sim_pose(p)).pack(side="left", padx=3)
@@ -421,12 +379,6 @@ class GestureApp(ctk.CTk):
                                       hover_color=["#36719F", "#144870"])
             self._append_log("[info] Tracker stopped.")
 
-    def _on_mode_change(self) -> None:
-        self.config_mgr.set("active_mode", self.mode_var.get())
-        self.config_mgr.save()
-        self._render_bindings()
-        self._append_log(f"[info] Mode → {self.mode_var.get()}")
-
     def _set_binding(self, gesture: str, value: str) -> None:
         active = self.mode_var.get()
         if not value:
@@ -435,23 +387,9 @@ class GestureApp(ctk.CTk):
             self.config_mgr.set_binding(active, gesture, value)
         self.config_mgr.save()
 
-    def _set_mouse_field(self, key: str, value: str) -> None:
-        self.config_mgr.data["modes"]["mouse"][key] = value
-        self.config_mgr.save()
-
     def _test_binding(self, gesture: str) -> None:
         active = self.mode_var.get()
         cfg = self.config_mgr.data["modes"].get(active, {})
-        if active in ("mouse", "macos"):
-            if gesture == cfg.get("click_gesture"):
-                self.executor.execute("mouse:left_click")
-                return
-            if gesture == cfg.get("right_click_gesture"):
-                self.executor.execute("mouse:right_click")
-                return
-            if active == "mouse":
-                self._append_log(f"[test] no action for '{gesture}' in mouse mode")
-                return
         action = (cfg.get("bindings") or {}).get(gesture)
         if not action and "+" in gesture:
             action = (cfg.get("bindings") or {}).get(gesture.split("+", 1)[0])
@@ -468,14 +406,11 @@ class GestureApp(ctk.CTk):
         if isinstance(self.tracker, MockTracker):
             self.tracker.set_pose(pose)
 
-    def _on_sensitivity_change(self, v: float) -> None:
-        self.config_mgr.set("sensitivity", round(float(v), 2))
-        self.sens_val.configure(text=f"{float(v):.2f}")
-        self.config_mgr.save()
-
-    def _on_smoothing_change(self, v: float) -> None:
-        self.config_mgr.set("smoothing", round(float(v), 2))
-        self.smooth_val.configure(text=f"{float(v):.2f}")
+    def _on_scroll_sensitivity_change(self, v: float) -> None:
+        val = round(float(v), 2)
+        macos = self.config_mgr.data["modes"].setdefault("macos", {})
+        macos.setdefault("scroll", {})["sensitivity"] = val
+        self.scroll_sens_val.configure(text=f"{val:.2f}")
         self.config_mgr.save()
 
     def _on_cooldown_change(self, v: float) -> None:
@@ -525,13 +460,16 @@ class GestureApp(ctk.CTk):
 
     def _reset_config(self) -> None:
         self.config_mgr.reset()
-        self.mode_var.set(self.config_mgr.data.get("active_mode", "mouse"))
-        self.sens_slider.set(float(self.config_mgr.data.get("sensitivity", 1.2)))
-        self.smooth_slider.set(float(self.config_mgr.data.get("smoothing", 0.35)))
+        self.mode_var.set(self.config_mgr.data.get("active_mode", "macos"))
+        scroll_cfg = (self.config_mgr.data.get("modes", {})
+                      .get("macos", {}).get("scroll", {}))
+        self.scroll_sens_slider.set(float(scroll_cfg.get("sensitivity", 1.0)))
         self.cool_slider.set(float(self.config_mgr.data.get("gesture_cooldown_ms", 450)))
-        self._on_sensitivity_change(self.sens_slider.get())
-        self._on_smoothing_change(self.smooth_slider.get())
+        self._on_scroll_sensitivity_change(self.scroll_sens_slider.get())
         self._on_cooldown_change(self.cool_slider.get())
+        self.mount_var.set(self.config_mgr.data.get("mount_orientation", "desktop"))
+        self.hand_var.set(self.config_mgr.data.get("hand_preference", "right"))
+        self.gestures_var.set(bool(self.config_mgr.data.get("gestures_enabled", True)))
         self._render_bindings()
         self._append_log("[info] Configuration reset to defaults.")
 

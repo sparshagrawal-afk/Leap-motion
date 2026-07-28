@@ -44,33 +44,3 @@ def test_mock_tracker_end_to_end_swipe_right_triggers_media_next(tmp_path):
     assert swipe_events, f"no swipe_right event; got {events}"
     assert swipe_events[0][1] == "media_next"
     assert ex.last_action == "media_next"
-
-
-def test_mock_tracker_pinch_triggers_click_in_mouse_mode(tmp_path):
-    (tmp_path / "config.default.json").write_text('''{
-        "active_mode": "mouse",
-        "sensitivity": 1.0, "smoothing": 0.3, "gesture_cooldown_ms": 200,
-        "swipe_min_velocity_mm_s": 400, "pinch_threshold": 0.85,
-        "modes": {
-            "mouse": {"enabled": true, "cursor_gesture": "point",
-                      "click_gesture": "pinch", "right_click_gesture": "two_fingers_pinch"}
-        }
-    }''')
-    cfg = ConfigManager(tmp_path)
-    ex = ActionExecutor(dry_run=True)
-    rec = GestureRecognizer(cooldown_ms=200)
-    mode = ModeController(cfg, ex)
-    events = []
-    mode.on_event(lambda g, a: events.append((g, a)))
-    rec.on_gesture(mode.handle_gesture)
-
-    tracker = MockTracker()
-    tracker.on_frame(rec.process)
-    tracker.start()
-    tracker.set_pose("pinch")
-    time.sleep(0.5)
-    tracker.stop()
-
-    pinch_events = [e for e in events if e[0] == "pinch"]
-    assert pinch_events, f"no pinch event; got {events}"
-    assert pinch_events[0][1] == "mouse:left_click"
