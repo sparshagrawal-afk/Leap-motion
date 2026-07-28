@@ -1,5 +1,6 @@
 {
   "active_mode": "mouse",
+  "gestures_enabled": true,
   "hand_preference": "right",
   "mount_orientation": "desktop",
   "sensitivity": 1.2,

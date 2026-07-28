@@ -53,6 +53,13 @@ class ModeController:
 
     # ---------- Called on every frame (for cursor / scroll modes) ----------
     def handle_frame(self, frame: HandFrame) -> None:
+        # Global master switch: when off, we suppress every OS side-effect
+        # (cursor move, scroll, clicks, hotkeys) while the tracker keeps
+        # running so the user can still see hand data in the GUI.
+        if not self.config.data.get("gestures_enabled", True):
+            self._smooth_xy = None
+            self._scroll_prev_pos = None
+            return
         active = self.config.data.get("active_mode", "mouse")
         if active not in self._MOUSE_LIKE_MODES:
             return
@@ -170,6 +177,9 @@ class ModeController:
 
     # ---------- Called when a discrete gesture fires ----------
     def handle_gesture(self, gesture: str, frame: HandFrame) -> None:
+        # Global master switch — see handle_frame().
+        if not self.config.data.get("gestures_enabled", True):
+            return
         active = self.config.data.get("active_mode", "mouse")
         modes = self.config.data.get("modes", {})
         mode_cfg = modes.get(active, {})

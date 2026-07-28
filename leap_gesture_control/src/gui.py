@@ -171,14 +171,29 @@ class GestureApp(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             command=self._toggle_tracking,
         )
-        self.toggle_btn.grid(row=3 + len(MODES) + 1, column=0, padx=20, pady=(0, 12), sticky="ew")
+        self.toggle_btn.grid(row=3 + len(MODES) + 1, column=0, padx=20, pady=(0, 8), sticky="ew")
+
+        # Master enable switch — pauses all OS side-effects while keeping the
+        # tracker running so the user can still see hand data.
+        self.gestures_var = ctk.BooleanVar(
+            value=bool(self.config_mgr.data.get("gestures_enabled", True))
+        )
+        self.gestures_switch = ctk.CTkSwitch(
+            sidebar, text="Gestures active",
+            variable=self.gestures_var,
+            command=self._on_gestures_toggle,
+            font=ctk.CTkFont(size=13),
+        )
+        self.gestures_switch.grid(
+            row=3 + len(MODES) + 2, column=0, padx=24, pady=(0, 12), sticky="w"
+        )
 
         self.reset_btn = ctk.CTkButton(
             sidebar, text="Reset to defaults", height=32, fg_color="transparent",
             border_width=1, text_color=("#333", "#ddd"),
             command=self._reset_config,
         )
-        self.reset_btn.grid(row=3 + len(MODES) + 2, column=0, padx=20, pady=(0, 20), sticky="ew")
+        self.reset_btn.grid(row=3 + len(MODES) + 3, column=0, padx=20, pady=(0, 20), sticky="ew")
 
         # Main area ----------------------------------------------------------
         main = ctk.CTkFrame(self, corner_radius=0, fg_color=("#f6f7f9", "#1a1a1a"))
@@ -489,6 +504,24 @@ class GestureApp(ctk.CTk):
         except Exception:  # noqa: BLE001
             pass
         self._append_log(f"[info] Tracked hand → {value}")
+
+    def _on_gestures_toggle(self) -> None:
+        enabled = bool(self.gestures_var.get())
+        self.config_mgr.set("gestures_enabled", enabled)
+        self.config_mgr.save()
+        # Update the last-action cell to make the state obvious.
+        try:
+            if enabled:
+                self._last_action = "—"
+                self.action_label.configure(text="—", text_color=("#000", "#fff"))
+                self.gestures_switch.configure(text="Gestures active")
+            else:
+                self._last_action = "PAUSED"
+                self.action_label.configure(text="PAUSED", text_color="#c0392b")
+                self.gestures_switch.configure(text="Gestures paused")
+        except Exception:  # noqa: BLE001
+            pass
+        self._append_log(f"[info] Gestures {'ENABLED' if enabled else 'PAUSED'}")
 
     def _reset_config(self) -> None:
         self.config_mgr.reset()
