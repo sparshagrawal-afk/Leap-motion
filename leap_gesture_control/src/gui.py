@@ -11,7 +11,10 @@ Layout:
 from __future__ import annotations
 
 import logging
+import os
+import platform
 import queue
+import subprocess
 import time
 from pathlib import Path
 import customtkinter as ctk
@@ -98,6 +101,41 @@ class GestureApp(ctk.CTk):
         self.after(150, self._poll_log_queue)
         self.after(400, self._refresh_status)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # macOS: launched-from-Terminal windows land behind and swallow the
+        # first click as "activation only" (widgets appear to need two clicks).
+        # Force the process to the front and hand focus to the window.
+        self.after(50, self._force_frontmost_macos)
+
+    def _force_frontmost_macos(self) -> None:
+        """Bring the Python process + window to the foreground on macOS so
+        the first click on any widget is treated as a real click.
+        """
+        try:
+            # Works on every platform: raise + focus.
+            self.lift()
+            self.attributes("-topmost", True)
+            self.after(300, lambda: self.attributes("-topmost", False))
+            self.focus_force()
+        except Exception:  # noqa: BLE001
+            pass
+        if platform.system() != "Darwin":
+            return
+        # AppleScript: activate the Python process so it becomes the frontmost
+        # Cocoa app (fixes the "swallowed first click" issue).
+        try:
+            subprocess.Popen(
+                [
+                    "osascript",
+                    "-e",
+                    'tell application "System Events" to set frontmost of '
+                    f"(the first process whose unix id is {os.getpid()}) to true",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     # ---------- layout ----------
     def _build_layout(self) -> None:
