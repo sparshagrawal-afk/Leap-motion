@@ -12,6 +12,14 @@ Built with Python + `customtkinter` + the official **Ultraleap Gemini Python bin
 - 🎵 **Media mode** — swipe left/right for previous/next track, swipe up/down for volume, pinch to play/pause.
 - 📽️ **Presentation mode** — swipe right/left to advance slides, pinch to toggle full-screen.
 - 🎛️ **Custom mode** — bind any recognised gesture to any keystroke, hotkey combo, media command, or mouse action from the GUI.
+- 🍎 **macOS mode** — trackpad-style gestures for macOS:
+   - `point` → move cursor · `pinch` → left click · `two_fingers_pinch` → right click
+   - **Two-finger scroll** (index + middle): continuous, direction follows palm motion, natural scroll by default
+   - `open_palm` **swipe up** → Mission Control (Ctrl+↑)
+   - `open_palm` **swipe down** → App Exposé (Ctrl+↓)
+   - `open_palm` **swipe left/right** → switch between Spaces (Ctrl+←/→)
+   - `fist` → Launchpad (F4)
+   - All bindings editable from the Bindings tab.
 - 🧠 Robust gesture recognizer (pose hold + velocity/displacement swipes + per-gesture cooldown) so a single motion never fires twice.
 - 🕹️ **Built-in simulator** — the app works without hardware for testing/demoing. Just run `python main.py --mock` and drive gestures from the "Activity Log" tab.
 - 📝 Config is a plain JSON file; every change in the UI saves automatically.

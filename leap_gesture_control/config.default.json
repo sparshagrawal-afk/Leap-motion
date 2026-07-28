@@ -46,6 +46,25 @@
         "thumbs_up": "hotkey:ctrl+c",
         "two_fingers": "hotkey:ctrl+v"
       }
+    },
+    "macos": {
+      "enabled": true,
+      "cursor_gesture": "point",
+      "click_gesture": "pinch",
+      "right_click_gesture": "two_fingers_pinch",
+      "scroll": {
+        "enabled": true,
+        "natural": true,
+        "sensitivity": 1.0
+      },
+      "bindings": {
+        "swipe_up+open_palm": "hotkey:ctrl+up",
+        "swipe_down+open_palm": "hotkey:ctrl+down",
+        "swipe_left+open_palm": "hotkey:ctrl+left",
+        "swipe_right+open_palm": "hotkey:ctrl+right",
+        "fist": "key:f4",
+        "thumbs_up": "hotkey:fn+n"
+      }
     }
   }
 }

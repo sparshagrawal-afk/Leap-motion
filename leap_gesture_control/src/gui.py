@@ -29,11 +29,22 @@ from .mode_controller import ModeController
 log = logging.getLogger("gesture.gui")
 
 APP_TITLE = "Leap Gesture Control"
-MODES = ["mouse", "media", "presentation", "custom"]
+MODES = ["mouse", "media", "presentation", "custom", "macos"]
+MODE_LABELS = {
+    "mouse": "Mouse",
+    "media": "Media",
+    "presentation": "Presentation",
+    "custom": "Custom",
+    "macos": "macOS",
+}
 GESTURES = [
     "point", "open_palm", "fist", "thumbs_up", "two_fingers",
     "pinch", "two_fingers_pinch",
     "swipe_left", "swipe_right", "swipe_up", "swipe_down",
+    "swipe_left+open_palm", "swipe_right+open_palm",
+    "swipe_up+open_palm", "swipe_down+open_palm",
+    "swipe_left+two_fingers", "swipe_right+two_fingers",
+    "swipe_up+two_fingers", "swipe_down+two_fingers",
 ]
 ACTION_PRESETS = [
     "media_play_pause", "media_next", "media_previous",
@@ -111,7 +122,8 @@ class GestureApp(ctk.CTk):
         self.mode_var = ctk.StringVar(value=self.config_mgr.data.get("active_mode", "mouse"))
         for i, m in enumerate(MODES):
             btn = ctk.CTkRadioButton(
-                sidebar, text=m.capitalize(), variable=self.mode_var, value=m,
+                sidebar, text=MODE_LABELS.get(m, m.capitalize()),
+                variable=self.mode_var, value=m,
                 command=self._on_mode_change, font=ctk.CTkFont(size=14),
             )
             btn.grid(row=3 + i, column=0, padx=24, pady=6, sticky="w")
@@ -121,14 +133,14 @@ class GestureApp(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             command=self._toggle_tracking,
         )
-        self.toggle_btn.grid(row=8, column=0, padx=20, pady=(0, 12), sticky="ew")
+        self.toggle_btn.grid(row=3 + len(MODES) + 1, column=0, padx=20, pady=(0, 12), sticky="ew")
 
         self.reset_btn = ctk.CTkButton(
             sidebar, text="Reset to defaults", height=32, fg_color="transparent",
             border_width=1, text_color=("#333", "#ddd"),
             command=self._reset_config,
         )
-        self.reset_btn.grid(row=9, column=0, padx=20, pady=(0, 20), sticky="ew")
+        self.reset_btn.grid(row=3 + len(MODES) + 2, column=0, padx=20, pady=(0, 20), sticky="ew")
 
         # Main area ----------------------------------------------------------
         main = ctk.CTkFrame(self, corner_radius=0, fg_color=("#f6f7f9", "#1a1a1a"))
@@ -237,8 +249,9 @@ class GestureApp(ctk.CTk):
             w.destroy()
         active = self.mode_var.get()
         cfg = self.config_mgr.data["modes"].get(active, {})
-        if active == "mouse":
-            # special layout: cursor / click gestures
+        row_offset = 0
+        if active in ("mouse", "macos"):
+            # cursor / click gesture rows (shared between mouse-like modes)
             rows = [
                 ("Cursor pose", "cursor_gesture", ["point", "open_palm"]),
                 ("Left click", "click_gesture", ["pinch", "fist", "thumbs_up"]),
@@ -254,12 +267,38 @@ class GestureApp(ctk.CTk):
                     width=200,
                 )
                 combo.grid(row=i, column=1, padx=12, pady=8, sticky="w")
-            return
+            row_offset = len(rows)
+            if active == "mouse":
+                return
+            # macOS-only: scroll toggle row
+            scroll_cfg = cfg.get("scroll", {}) or {}
+            ctk.CTkLabel(self.bindings_frame, text="Scroll (two-finger)", anchor="w",
+                         font=ctk.CTkFont(size=13)).grid(
+                row=row_offset, column=0, padx=12, pady=8, sticky="w")
+            self._scroll_enabled_var = ctk.BooleanVar(value=bool(scroll_cfg.get("enabled", True)))
+            ctk.CTkSwitch(self.bindings_frame, text="enabled",
+                          variable=self._scroll_enabled_var,
+                          command=lambda: self._set_scroll_field("enabled", self._scroll_enabled_var.get())
+                          ).grid(row=row_offset, column=1, padx=12, pady=8, sticky="w")
+            row_offset += 1
+            self._scroll_natural_var = ctk.BooleanVar(value=bool(scroll_cfg.get("natural", True)))
+            ctk.CTkLabel(self.bindings_frame, text="Natural scroll", anchor="w",
+                         font=ctk.CTkFont(size=13)).grid(
+                row=row_offset, column=0, padx=12, pady=8, sticky="w")
+            ctk.CTkSwitch(self.bindings_frame, text="on (macOS default)",
+                          variable=self._scroll_natural_var,
+                          command=lambda: self._set_scroll_field("natural", self._scroll_natural_var.get())
+                          ).grid(row=row_offset, column=1, padx=12, pady=8, sticky="w")
+            row_offset += 1
+            ctk.CTkFrame(self.bindings_frame, height=1, fg_color=("#e0e0e0", "#333")).grid(
+                row=row_offset, column=0, columnspan=3, sticky="ew", padx=12, pady=(4, 8))
+            row_offset += 1
 
         bindings: Dict[str, str] = cfg.get("bindings", {}) or {}
         for i, g in enumerate(GESTURES):
+            row = row_offset + i
             ctk.CTkLabel(self.bindings_frame, text=g, anchor="w",
-                         font=ctk.CTkFont(size=13)).grid(row=i, column=0, padx=12, pady=6, sticky="w")
+                         font=ctk.CTkFont(size=13)).grid(row=row, column=0, padx=12, pady=6, sticky="w")
             current = bindings.get(g, "")
             values = [""] + ACTION_PRESETS
             if current and current not in values:
@@ -269,18 +308,25 @@ class GestureApp(ctk.CTk):
                 self.bindings_frame, values=values, variable=var, width=340,
                 command=lambda v, gg=g: self._set_binding(gg, v),
             )
-            combo.grid(row=i, column=1, padx=12, pady=6, sticky="w")
+            combo.grid(row=row, column=1, padx=12, pady=6, sticky="w")
             # test button
             ctk.CTkButton(
                 self.bindings_frame, text="Test", width=64,
                 command=lambda gg=g: self._test_binding(gg),
-            ).grid(row=i, column=2, padx=(0, 12), pady=6)
+            ).grid(row=row, column=2, padx=(0, 12), pady=6)
 
         if self.use_mock:
             ctk.CTkLabel(self.bindings_frame,
                          text="Simulator: use ‘Test’ buttons or the mock controls in Activity Log tab.",
-                         text_color=("#777", "#aaa")).grid(row=len(GESTURES), column=0,
-                                                            columnspan=3, padx=12, pady=10, sticky="w")
+                         text_color=("#777", "#aaa")).grid(
+                row=row_offset + len(GESTURES), column=0,
+                columnspan=3, padx=12, pady=10, sticky="w")
+
+    def _set_scroll_field(self, key: str, value) -> None:
+        macos = self.config_mgr.data["modes"].setdefault("macos", {})
+        scroll = macos.setdefault("scroll", {})
+        scroll[key] = value
+        self.config_mgr.save()
 
     def _build_log_tab(self, parent) -> None:
         parent.grid_columnconfigure(0, weight=1)
@@ -335,15 +381,19 @@ class GestureApp(ctk.CTk):
     def _test_binding(self, gesture: str) -> None:
         active = self.mode_var.get()
         cfg = self.config_mgr.data["modes"].get(active, {})
-        if active == "mouse":
+        if active in ("mouse", "macos"):
             if gesture == cfg.get("click_gesture"):
                 self.executor.execute("mouse:left_click")
-            elif gesture == cfg.get("right_click_gesture"):
+                return
+            if gesture == cfg.get("right_click_gesture"):
                 self.executor.execute("mouse:right_click")
-            else:
+                return
+            if active == "mouse":
                 self._append_log(f"[test] no action for '{gesture}' in mouse mode")
-            return
+                return
         action = (cfg.get("bindings") or {}).get(gesture)
+        if not action and "+" in gesture:
+            action = (cfg.get("bindings") or {}).get(gesture.split("+", 1)[0])
         if not action:
             self._append_log(f"[test] no binding for '{gesture}'")
             return

@@ -60,6 +60,21 @@ leap_gesture_control/
 - ✅ Added 4 new tests covering the four improvements above.
 - ✅ Unused imports cleaned up; codebase lints clean under ruff.
 
+## macOS mode (2026-01-27)
+- ✅ New **macOS mode** — trackpad-parity gestures alongside the existing four modes.
+- ✅ **Pose-modified swipes** — recognizer now emits both the base swipe (`swipe_up`) and a pose-tagged variant (`swipe_up+open_palm`, `swipe_left+two_fingers`, …) so modes can distinguish e.g. a plain swipe from a Mission Control gesture. Base events still fire, so existing modes are unaffected.
+- ✅ **Continuous two-finger scroll** — index + middle extended + palm motion produces per-frame scroll clicks in the executor. Configurable natural/traditional direction, per-mode enable toggle, sensitivity-aware click threshold. Falls through cleanly to cursor movement when scroll is disabled.
+- ✅ ActionExecutor: `scroll(dx, dy)` supports both vertical (mouse wheel) and horizontal (pyautogui hscroll on macOS, Shift+scroll fallback elsewhere).
+- ✅ Default macOS bindings:
+  - `pinch` → left click, `two_fingers_pinch` → right click
+  - `swipe_up+open_palm` → Ctrl+↑ (Mission Control)
+  - `swipe_down+open_palm` → Ctrl+↓ (App Exposé)
+  - `swipe_left/right+open_palm` → Ctrl+←/→ (switch Spaces)
+  - `fist` → F4 (Launchpad)
+- ✅ GUI: mode radio adds "macOS", bindings tab exposes the shared cursor/click rows plus scroll-enable and natural-scroll switches; the gesture list is expanded to include all pose-modified swipe variants.
+- ✅ Fallback: modes that bind bare `swipe_left` still work when a pose-modified `swipe_left+two_fingers` fires — the controller looks up the modifier first, then the base.
+- ✅ Test suite: **38/38 passing** (28 previous + 10 new covering pose-modified swipes, macOS cursor/click, Mission Control binding, Launchpad, scroll continuous emission, scroll-disabled fallback, base-swipe regression).
+
 ## Test verification
 - `pytest tests/ -q` → 24 passed.
 - `python main.py --headless --mock` boots cleanly (OS action backends warn only because this cloud sandbox has no display — expected; will work on user machine).

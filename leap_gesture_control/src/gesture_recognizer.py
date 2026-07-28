@@ -109,6 +109,13 @@ class GestureRecognizer:
         if swipe and self._can_fire(swipe, now):
             self._mark_fired(swipe, now)
             fired.append(swipe)
+            # Also emit a pose-modified variant (e.g. "swipe_up+open_palm") so
+            # modes can distinguish e.g. Mission Control (open-palm swipe up)
+            # from a plain swipe-up. The base event still fires for backward
+            # compatibility with modes that don't care about the modifier.
+            swipe_pose = self._dominant_pose_during_swipe()
+            if swipe_pose and swipe_pose not in ("pinch", "two_fingers_pinch"):
+                fired.append(f"{swipe}+{swipe_pose}")
 
         for g in fired:
             for cb in self._listeners:
@@ -125,10 +132,14 @@ class GestureRecognizer:
 
     def _mark_fired(self, gesture: str, now: float) -> None:
         self._last_gesture_time[gesture] = now
-        # Also cool down all swipes together so one motion fires once.
+        # Also cool down all swipes together (including pose-modified variants)
+        # so one physical motion never fires twice.
         if gesture.startswith("swipe_"):
+            base = gesture.split("+", 1)[0]
             for g in ("swipe_left", "swipe_right", "swipe_up", "swipe_down"):
                 self._last_gesture_time[g] = now
+            # Also mark the specific modified variant so its cooldown applies.
+            self._last_gesture_time[base] = now
 
     def _detect_swipe(self, now: float) -> Optional[str]:
         if len(self._history) < 4:
@@ -165,3 +176,23 @@ class GestureRecognizer:
         if abs_dy > abs_dx * 1.4 and abs_vy >= self.swipe_min_velocity:
             return "swipe_up" if dy > 0 else "swipe_down"
         return None
+
+    def _dominant_pose_during_swipe(self) -> Optional[str]:
+        """Return the most common pose observed in the last motion window.
+
+        Used to attach a pose modifier to a swipe event so e.g. an open-palm
+        swipe can be told apart from a two-finger swipe.
+        """
+        if not self._history:
+            return None
+        now = self._history[-1].timestamp
+        counts: dict[str, int] = {}
+        for f in reversed(self._history):
+            if now - f.timestamp > MOTION_WINDOW_S:
+                break
+            pose = _classify_pose(f, self.pinch_threshold)
+            if pose:
+                counts[pose] = counts.get(pose, 0) + 1
+        if not counts:
+            return None
+        return max(counts, key=counts.get)

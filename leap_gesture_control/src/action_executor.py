@@ -90,11 +90,26 @@ class ActionExecutor:
         except Exception as e:  # noqa: BLE001
             log.debug("move_cursor failed: %s", e)
 
-    def scroll(self, dy: int) -> None:
+    def scroll(self, dx: int = 0, dy: int = 0) -> None:
+        """Scroll by (dx, dy) 'clicks'.
+
+        dy > 0 scrolls up (content moves down), dy < 0 scrolls down.
+        dx > 0 scrolls right, dx < 0 scrolls left.
+        """
         if self.dry_run or self._pyautogui is None:
             return
         try:
-            self._pyautogui.scroll(int(dy))
+            if dy:
+                self._pyautogui.scroll(int(dy))
+            if dx:
+                # pyautogui has hscroll on macOS/Linux only; guard for it.
+                if hasattr(self._pyautogui, "hscroll"):
+                    self._pyautogui.hscroll(int(dx))
+                else:
+                    # Fallback: emulate horizontal scroll via Shift+scroll.
+                    self._pyautogui.keyDown("shift")
+                    self._pyautogui.scroll(int(dx))
+                    self._pyautogui.keyUp("shift")
         except Exception as e:  # noqa: BLE001
             log.debug("scroll failed: %s", e)
 
