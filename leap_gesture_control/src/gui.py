@@ -202,8 +202,16 @@ class GestureApp(ctk.CTk):
             tune, values=["desktop", "screen_top"], variable=self.mount_var,
             command=self._on_mount_change,
         ).grid(row=3, column=1, padx=(0, 12), pady=12, sticky="w")
-        ctk.CTkLabel(tune, text="hand", text_color=("#999", "#777"),
-                     font=ctk.CTkFont(size=11)).grid(row=3, column=2, padx=(0, 20), pady=12)
+
+        ctk.CTkLabel(tune, text="Tracked hand", font=ctk.CTkFont(size=13)).grid(
+            row=4, column=0, padx=(20, 12), pady=12, sticky="w")
+        self.hand_var = ctk.StringVar(
+            value=self.config_mgr.data.get("hand_preference", "right")
+        )
+        ctk.CTkSegmentedButton(
+            tune, values=["left", "right", "both"], variable=self.hand_var,
+            command=self._on_hand_change,
+        ).grid(row=4, column=1, padx=(0, 12), pady=12, sticky="w")
 
         # Bindings + Log tabs
         self.tabs = ctk.CTkTabview(main, corner_radius=12)
@@ -428,6 +436,21 @@ class GestureApp(ctk.CTk):
         self.config_mgr.set("mount_orientation", value)
         self.config_mgr.save()
         self._append_log(f"[info] Mount orientation → {value}")
+
+    def _on_hand_change(self, value: str) -> None:
+        self.config_mgr.set("hand_preference", value)
+        self.config_mgr.save()
+        # Update the live tracker filter immediately (no restart needed).
+        try:
+            self.tracker.hand_preference = value
+        except Exception:  # noqa: BLE001
+            pass
+        # Update the status card cell.
+        try:
+            self.hand_label.configure(text=value)
+        except Exception:  # noqa: BLE001
+            pass
+        self._append_log(f"[info] Tracked hand → {value}")
 
     def _reset_config(self) -> None:
         self.config_mgr.reset()

@@ -77,3 +77,17 @@ def test_corrupt_user_file_falls_back_to_defaults(tmp_path):
     (tmp_path / "config.json").write_text("{{not json")
     m = ConfigManager(tmp_path)
     assert m.data["active_mode"] == "mouse"
+
+
+def test_hand_preference_persists(tmp_path):
+    _make_app_dir(tmp_path)
+    m = ConfigManager(tmp_path)
+    m.set("hand_preference", "left")
+    m.save()
+    reloaded = ConfigManager(tmp_path)
+    assert reloaded.data["hand_preference"] == "left"
+    # 'both' should also round-trip cleanly.
+    reloaded.set("hand_preference", "both")
+    reloaded.save()
+    again = ConfigManager(tmp_path)
+    assert again.data["hand_preference"] == "both"
