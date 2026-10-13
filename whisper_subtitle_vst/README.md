@@ -86,6 +86,30 @@ Write character names in **Names / terms** in English spelling so they come out 
 These languages have much less Whisper training data than English, so review the translated
 subtitles before delivery. You can fix any line in the SRT box and click **Apply edits**.
 
+## Give it to a friend: one-file Mac installer
+
+On your Mac, from this folder:
+
+```bash
+./scripts/make-mac-installer.sh
+```
+
+This produces **`dist/Whisper Subtitles Installer.pkg`**, the only file your friend needs. When
+they double-click it, it installs both plugins (AU + VST3, for all users) and the standalone app.
+It also downloads the speech model to `/Users/Shared/Whisper Subtitles/models`. The plugins find
+that model by themselves, so your friend just opens their DAW and inserts the plugin.
+
+- It runs on Apple Silicon and Intel Macs. `--arm64-only` builds faster if every Mac involved is Apple Silicon.
+- `--bundle-model` puts the model inside the .pkg, which makes it about 3 GB but needs no internet at install.
+- `--model medium` uses the smaller 1.5 GB model.
+- The .pkg isn't signed with an Apple Developer ID, so macOS blocks it the first time. Your friend
+  double-clicks it, clicks **Done**, then goes to **System Settings → Privacy & Security** and
+  clicks **Open Anyway**. With a Developer ID, set `DEVELOPER_ID_INSTALLER` / `DEVELOPER_ID_APP`
+  (see the top of the script) and the warning goes away.
+
+The installer puts the plugins in `/Library/Audio/Plug-Ins`. If you also copied them into
+`~/Library/Audio/Plug-Ins` by hand, delete those copies so your DAW doesn't list them twice.
+
 ## Models
 
 Download a model with the included script (or grab any `ggml-*.bin` from

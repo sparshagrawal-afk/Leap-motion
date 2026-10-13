@@ -20,6 +20,26 @@ WhisperSubtitlesProcessor::WhisperSubtitlesProcessor()
    #if JucePlugin_Enable_ARA
     startTimerHz (2); // picks up new clips, finished transcriptions and moved clips
    #endif
+
+    // After the host has restored any saved state: if no model was chosen, use the one the
+    // engine already has (another instance loaded it) or the one the installer downloaded.
+    juce::MessageManager::callAsync ([this, weak = std::weak_ptr<Lifetime> (lifetime)]
+    {
+        auto l = weak.lock();
+
+        if (l == nullptr || ! l->alive || getModelFile() != juce::File())
+            return;
+
+        if (auto loaded = transcriber->getModelFile(); loaded != juce::File())
+        {
+            const juce::ScopedLock sl (settingsLock);
+            modelFile = loaded;
+        }
+        else if (auto installed = Transcriber::findInstalledModel(); installed != juce::File())
+        {
+            setModelFile (installed);
+        }
+    });
 }
 
 WhisperSubtitlesProcessor::~WhisperSubtitlesProcessor()

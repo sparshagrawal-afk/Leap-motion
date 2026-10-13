@@ -38,6 +38,44 @@ juce::String Transcriber::settingsKey (const Settings& s)
          + "|" + (s.dropNonSpeech ? "d" : "-") + "|" + s.prompt.trim();
 }
 
+juce::Array<juce::File> Transcriber::getStandardModelFolders()
+{
+    juce::Array<juce::File> folders;
+
+   #if JUCE_MAC
+    folders.add (juce::File ("/Users/Shared/Whisper Subtitles/models")); // where the Mac installer puts it
+   #endif
+
+    folders.add (juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                     .getChildFile ("Whisper Subtitles").getChildFile ("models"));
+    folders.add (juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory)
+                     .getChildFile ("Whisper Subtitles").getChildFile ("models"));
+    return folders;
+}
+
+juce::File Transcriber::findInstalledModel()
+{
+    // Best first. Turbo is last among the large ones because it translates poorly.
+    static const char* preferred[] = { "ggml-large-v3.bin", "ggml-large-v2.bin", "ggml-medium.bin",
+                                       "ggml-large-v3-turbo.bin", "ggml-small.bin", "ggml-base.bin",
+                                       "ggml-medium.en.bin", "ggml-small.en.bin", "ggml-base.en.bin",
+                                       "ggml-tiny.bin", "ggml-tiny.en.bin" };
+
+    const auto folders = getStandardModelFolders();
+
+    for (auto* name : preferred)
+        for (auto& folder : folders)
+            if (auto f = folder.getChildFile (name); f.existsAsFile() && f.getSize() > 10 * 1024 * 1024)
+                return f;
+
+    for (auto& folder : folders)
+        for (auto& f : folder.findChildFiles (juce::File::findFiles, false, "ggml-*.bin"))
+            if (f.getSize() > 10 * 1024 * 1024)
+                return f;
+
+    return {};
+}
+
 Transcriber::Transcriber() : juce::Thread ("Whisper transcriber")
 {
     whisper_log_set (silentLog, nullptr);

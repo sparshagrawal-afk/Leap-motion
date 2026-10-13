@@ -38,6 +38,12 @@ public:
     /** Produces 16 kHz mono audio; called on the worker thread right before transcribing. */
     using AudioProvider = std::function<std::vector<float>()>;
 
+    /** Folders the installer puts models in (searched when no model has been chosen). */
+    static juce::Array<juce::File> getStandardModelFolders();
+
+    /** The best model found in the standard folders, or File() if there is none. */
+    static juce::File findInstalledModel();
+
     /** Loads a ggml model, unless that file is already loaded or loading. */
     void loadModel (const juce::File& modelFile);
     juce::File getModelFile() const;
