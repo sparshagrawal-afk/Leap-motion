@@ -56,14 +56,14 @@ WhisperSubtitlesProcessor::~WhisperSubtitlesProcessor()
 
 Transcriber::ResultCallback WhisperSubtitlesProcessor::guarded (Transcriber::ResultCallback fn)
 {
-    return [weak = std::weak_ptr<Lifetime> (lifetime), fn = std::move (fn)] (bool ok, double s, double e, SubtitleList cues)
+    return [weak = std::weak_ptr<Lifetime> (lifetime), callback = std::move (fn)] (bool ok, double s, double e, SubtitleList cues)
     {
         if (auto l = weak.lock())
         {
             const std::lock_guard<std::mutex> lock (l->lock);
 
             if (l->alive)
-                fn (ok, s, e, std::move (cues));
+                callback (ok, s, e, std::move (cues));
         }
     };
 }

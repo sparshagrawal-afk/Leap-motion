@@ -225,14 +225,14 @@ void Transcriber::transcribe (double startSeconds, AudioProvider provider,
 {
     ++pendingJobs;
 
-    post ([this, startSeconds, provider = std::move (provider), settings, onDone = std::move (onDone)]
+    post ([this, startSeconds, readAudio = std::move (provider), settings, done = std::move (onDone)]
     {
         Result result;
 
         if (! cancelRequested)
         {
             setStatus ("Reading audio...");
-            const auto audio = provider();
+            const auto audio = readAudio();
             result = runTranscription (startSeconds, audio, settings);
         }
 
@@ -241,8 +241,8 @@ void Transcriber::transcribe (double startSeconds, AudioProvider provider,
         if (pendingJobs.load() == 0)
             cancelRequested = false;
 
-        if (onDone)
-            onDone (result.ok, startSeconds, result.endSeconds, std::move (result.cues));
+        if (done)
+            done (result.ok, startSeconds, result.endSeconds, std::move (result.cues));
     });
 }
 

@@ -154,9 +154,12 @@ chmod +x "$WORK/scripts/preinstall" "$WORK/scripts/postinstall"
 step "Building the package"
 # Keep bundles at the install location even if copies exist elsewhere on the Mac
 pkgbuild --analyze --root "$PAYLOAD" "$WORK/components.plist" > /dev/null
-count=$(/usr/libexec/PlistBuddy -c "Print" "$WORK/components.plist" | grep -c "RootRelativeBundlePath" || true)
-for ((i = 0; i < count; i++)); do
-    /usr/libexec/PlistBuddy -c "Set :$i:BundleIsRelocatable false" "$WORK/components.plist"
+i=0
+while /usr/libexec/PlistBuddy -c "Print :$i" "$WORK/components.plist" > /dev/null 2>&1; do
+    # newer pkgbuild versions sometimes leave the key out, so delete + add instead of Set
+    /usr/libexec/PlistBuddy -c "Delete :$i:BundleIsRelocatable" "$WORK/components.plist" > /dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c "Add :$i:BundleIsRelocatable bool false" "$WORK/components.plist"
+    i=$((i + 1))
 done
 
 pkgbuild --root "$PAYLOAD" \
