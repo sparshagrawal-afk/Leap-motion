@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.22)
 
+# On Apple Silicon, build arm64 even if CMake guesses x86_64 (e.g. a Rosetta shell),
+# otherwise native DAWs such as Logic won't load the plugin.
+if(APPLE AND NOT CMAKE_OSX_ARCHITECTURES)
+    execute_process(COMMAND sysctl -n hw.optional.arm64
+                    OUTPUT_VARIABLE HOST_HAS_ARM64 OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(HOST_HAS_ARM64 STREQUAL "1")
+        set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "Target architecture" FORCE)
+    endif()
+endif()
+
 project(WhisperSubtitles VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)

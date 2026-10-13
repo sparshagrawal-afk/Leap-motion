@@ -39,9 +39,9 @@ namespace
 }
 
 WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
-    : AudioProcessorEditor (&p), processor (p)
+    : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    const auto settings = processor.getSettings();
+    const auto settings = audioProcessor.getSettings();
 
     // --- model
     addAndMakeVisible (loadModelButton);
@@ -90,21 +90,21 @@ WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
 
     // --- capture / transcription
     addAndMakeVisible (armedToggle);
-    armedToggle.setToggleState (processor.capture.armed.load(), juce::dontSendNotification);
-    armedToggle.onClick = [this] { processor.capture.armed = armedToggle.getToggleState(); };
+    armedToggle.setToggleState (audioProcessor.capture.armed.load(), juce::dontSendNotification);
+    armedToggle.onClick = [this] { audioProcessor.capture.armed = armedToggle.getToggleState(); };
 
     addAndMakeVisible (autoToggle);
-    autoToggle.setToggleState (processor.autoTranscribe.load(), juce::dontSendNotification);
-    autoToggle.onClick = [this] { processor.autoTranscribe = autoToggle.getToggleState(); };
+    autoToggle.setToggleState (audioProcessor.autoTranscribe.load(), juce::dontSendNotification);
+    autoToggle.onClick = [this] { audioProcessor.autoTranscribe = autoToggle.getToggleState(); };
 
     addAndMakeVisible (transcribeButton);
-    transcribeButton.onClick = [this] { processor.transcribeCaptured (false); };
+    transcribeButton.onClick = [this] { audioProcessor.transcribeCaptured (false); };
     addAndMakeVisible (retranscribeButton);
-    retranscribeButton.onClick = [this] { processor.transcribeCaptured (true); };
+    retranscribeButton.onClick = [this] { audioProcessor.transcribeCaptured (true); };
     addAndMakeVisible (cancelButton);
-    cancelButton.onClick = [this] { processor.transcriber.cancelAll(); };
+    cancelButton.onClick = [this] { audioProcessor.transcriber.cancelAll(); };
     addAndMakeVisible (clearAudioButton);
-    clearAudioButton.onClick = [this] { processor.capture.clear(); };
+    clearAudioButton.onClick = [this] { audioProcessor.capture.clear(); };
     addAndMakeVisible (clearSubsButton);
     clearSubsButton.onClick = [this]
     {
@@ -113,7 +113,7 @@ WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
                                             juce::ModalCallbackFunction::create ([this] (int result)
                                             {
                                                 if (result != 0)
-                                                    processor.clearSubtitles();
+                                                    audioProcessor.clearSubtitles();
                                             }));
     };
 
@@ -148,9 +148,9 @@ WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
     addAndMakeVisible (offsetLabel);
     addAndMakeVisible (offsetEditor);
     offsetEditor.setInputRestrictions (12, "0123456789.-");
-    offsetEditor.setText (juce::String (processor.exportOffsetSeconds.load()), false);
+    offsetEditor.setText (juce::String (audioProcessor.exportOffsetSeconds.load()), false);
     offsetEditor.setTooltip ("Subtracted from every cue on export. Use 3600 if your session starts at 01:00:00:00.");
-    offsetEditor.onTextChange = [this] { processor.exportOffsetSeconds = offsetEditor.getText().getDoubleValue(); };
+    offsetEditor.onTextChange = [this] { audioProcessor.exportOffsetSeconds = offsetEditor.getText().getDoubleValue(); };
 
     addAndMakeVisible (exportSrtButton);
     exportSrtButton.onClick = [this] { exportFile (false); };
@@ -159,8 +159,8 @@ WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
     addAndMakeVisible (copyButton);
     copyButton.onClick = [this]
     {
-        juce::SystemClipboard::copyTextToClipboard (Subtitles::toSrt (processor.getSubtitles(),
-                                                                      processor.exportOffsetSeconds.load()));
+        juce::SystemClipboard::copyTextToClipboard (Subtitles::toSrt (audioProcessor.getSubtitles(),
+                                                                      audioProcessor.exportOffsetSeconds.load()));
     };
 
     setResizable (true, true);
@@ -191,7 +191,7 @@ void WhisperSubtitlesEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colours::grey);
     g.setFont (juce::FontOptions (12.0f));
-    g.drawText ("Preview @ " + Subtitles::formatTimestamp (processor.getPlayheadSeconds(), '.'),
+    g.drawText ("Preview @ " + Subtitles::formatTimestamp (audioProcessor.getPlayheadSeconds(), '.'),
                 previewArea.reduced (8, 4), juce::Justification::topLeft);
 
     g.setColour (juce::Colours::white);
@@ -272,11 +272,11 @@ void WhisperSubtitlesEditor::resized()
 //==============================================================================
 void WhisperSubtitlesEditor::timerCallback()
 {
-    auto& t = processor.transcriber;
-    auto& c = processor.capture;
+    auto& t = audioProcessor.transcriber;
+    auto& c = audioProcessor.capture;
 
-    const auto model = processor.getModelFile();
-    const auto warning = modelWarning (model.getFileName(), processor.getSettings());
+    const auto model = audioProcessor.getModelFile();
+    const auto warning = modelWarning (model.getFileName(), audioProcessor.getSettings());
     modelLabel.setText (t.isModelLoaded() ? "Model: " + model.getFileName() + (warning.isEmpty() ? "" : "  -  " + warning)
                                           : (model == juce::File() ? "No model loaded - pick a ggml-*.bin file"
                                                                    : t.getStatus()),
@@ -303,15 +303,15 @@ void WhisperSubtitlesEditor::timerCallback()
     retranscribeButton.setEnabled (t.isModelLoaded());
     cancelButton.setEnabled (t.isBusy());
 
-    if (processor.getSubtitleVersion() != shownVersion && ! editsPending)
+    if (audioProcessor.getSubtitleVersion() != shownVersion && ! editsPending)
         refreshSubtitleText();
 
-    const auto subs = processor.getSubtitles();
+    const auto subs = audioProcessor.getSubtitles();
     juce::String now;
-    if (auto* cue = Subtitles::findAt (subs, processor.getPlayheadSeconds()))
+    if (auto* cue = Subtitles::findAt (subs, audioProcessor.getPlayheadSeconds()))
         now = cue->text;
 
-    if (now != previewText || processor.isHostPlaying())
+    if (now != previewText || audioProcessor.isHostPlaying())
     {
         previewText = now;
         repaint (previewArea);
@@ -320,16 +320,16 @@ void WhisperSubtitlesEditor::timerCallback()
 
 void WhisperSubtitlesEditor::refreshSubtitleText()
 {
-    shownVersion = processor.getSubtitleVersion();
+    shownVersion = audioProcessor.getSubtitleVersion();
 
     const juce::ScopedValueSetter<bool> svs (settingTextProgrammatically, true);
-    srtEditor.setText (Subtitles::toSrt (processor.getSubtitles()), false);
+    srtEditor.setText (Subtitles::toSrt (audioProcessor.getSubtitles()), false);
     updateEditButtons();
 }
 
 void WhisperSubtitlesEditor::applyEdits()
 {
-    processor.setSubtitles (Subtitles::fromSrt (srtEditor.getText()));
+    audioProcessor.setSubtitles (Subtitles::fromSrt (srtEditor.getText()));
     editsPending = false;
     refreshSubtitleText();
 }
@@ -353,13 +353,13 @@ void WhisperSubtitlesEditor::pushSettings()
     s.prompt = promptEditor.getText();
     s.dropNonSpeech = dropNonSpeechToggle.getToggleState();
 
-    processor.setSettings (s);
+    audioProcessor.setSettings (s);
 }
 
 //==============================================================================
 void WhisperSubtitlesEditor::chooseModel()
 {
-    auto start = processor.getModelFile();
+    auto start = audioProcessor.getModelFile();
     if (! start.existsAsFile())
         start = juce::File::getSpecialLocation (juce::File::userHomeDirectory);
 
@@ -369,7 +369,7 @@ void WhisperSubtitlesEditor::chooseModel()
                               {
                                   auto f = fc.getResult();
                                   if (f.existsAsFile())
-                                      processor.setModelFile (f);
+                                      audioProcessor.setModelFile (f);
                               });
 }
 
@@ -392,8 +392,8 @@ void WhisperSubtitlesEditor::exportFile (bool vtt)
                                       return;
 
                                   f = f.withFileExtension (ext);
-                                  const auto subs = processor.getSubtitles();
-                                  const auto offset = processor.exportOffsetSeconds.load();
+                                  const auto subs = audioProcessor.getSubtitles();
+                                  const auto offset = audioProcessor.exportOffsetSeconds.load();
                                   const auto text = vtt ? Subtitles::toVtt (subs, offset)
                                                         : Subtitles::toSrt (subs, offset);
 

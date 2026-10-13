@@ -25,7 +25,7 @@ private:
     void exportFile (bool vtt);
     void updateEditButtons();
 
-    WhisperSubtitlesProcessor& processor;
+    WhisperSubtitlesProcessor& audioProcessor;
 
     juce::TextButton loadModelButton { "Load Whisper model..." };
     juce::Label modelLabel;
