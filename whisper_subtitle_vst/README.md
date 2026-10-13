@@ -20,6 +20,10 @@ subtitles, which you can then export as **.srt** or **.vtt**.
 5. **Stop.** With *Auto-transcribe when playback stops* on, that stretch is transcribed in the
    background and the cues appear in the list. You can also press **Transcribe new audio** at any time.
 6. The **Preview** box shows the cue at the playhead, so you can check timing as you play.
+   Click **Subtitle view** to shrink the plugin into a black subtitle screen that shows only
+   the current line as the playhead moves. Drag the window anywhere (e.g. under your video),
+   resize it from the corner (the text scales with it), and click **Expand** or double-click it
+   to get the full editor back. The plugin remembers the view and size with your project.
 7. Fix any text directly in the SRT box, then click **Apply edits**.
 8. Click **Export .srt...** or **Export .vtt...**. If your session starts at `01:00:00:00`, set
    **Export offset** to `3600` so the subtitle file starts at zero.

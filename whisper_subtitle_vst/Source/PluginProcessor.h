@@ -53,6 +53,10 @@ public:
     /** Seconds subtracted from every cue on export (e.g. 3600 for a 01:00:00:00 session start). */
     std::atomic<double> exportOffsetSeconds { 0.0 };
 
+    /** Editor shows only the subtitle line (a movable "subtitle screen"). */
+    std::atomic<bool> compactView { false };
+    std::atomic<int> compactWidth { 760 }, compactHeight { 150 };
+
     /** Transcribes every captured region (only those without cues yet unless 'all'). */
     void transcribeCaptured (bool all);
 

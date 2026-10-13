@@ -14,6 +14,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
     void timerCallback() override;
@@ -24,6 +25,8 @@ private:
     void applyEdits();
     void exportFile (bool vtt);
     void updateEditButtons();
+    void setCompact (bool shouldBeCompact);
+    void paintSubtitleScreen (juce::Graphics&);
 
     WhisperSubtitlesProcessor& audioProcessor;
 
@@ -63,6 +66,12 @@ private:
     juce::TextButton exportSrtButton { "Export .srt..." };
     juce::TextButton exportVttButton { "Export .vtt..." };
     juce::TextButton copyButton { "Copy SRT" };
+
+    juce::TextButton collapseButton { "Subtitle view" };
+    juce::TextButton expandButton { "Expand" };
+    std::vector<juce::Component*> fullViewComponents;
+    bool compact = false;
+    int fullWidth = 920, fullHeight = 660;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
     int shownVersion = -1;

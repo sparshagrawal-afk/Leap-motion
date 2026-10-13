@@ -6,7 +6,8 @@ namespace
     const juce::Identifier stateId ("WhisperSubtitlesState"),
                            modelId ("modelPath"), languageId ("language"), translateId ("translate"),
                            maxCharsId ("maxChars"), promptId ("prompt"), dropNonSpeechId ("dropNonSpeech"),
-                           autoId ("autoTranscribe"), armedId ("armed"), offsetId ("exportOffset");
+                           autoId ("autoTranscribe"), armedId ("armed"), offsetId ("exportOffset"),
+                           compactId ("compactView"), compactWId ("compactWidth"), compactHId ("compactHeight");
 }
 
 WhisperSubtitlesProcessor::WhisperSubtitlesProcessor()
@@ -193,6 +194,9 @@ void WhisperSubtitlesProcessor::getStateInformation (juce::MemoryBlock& destData
     state.setProperty (autoId, autoTranscribe.load(), nullptr);
     state.setProperty (armedId, capture.armed.load(), nullptr);
     state.setProperty (offsetId, exportOffsetSeconds.load(), nullptr);
+    state.setProperty (compactId, compactView.load(), nullptr);
+    state.setProperty (compactWId, compactWidth.load(), nullptr);
+    state.setProperty (compactHId, compactHeight.load(), nullptr);
     state.appendChild (Subtitles::toValueTree (getSubtitles()), nullptr);
 
     if (auto xml = state.createXml())
@@ -222,6 +226,9 @@ void WhisperSubtitlesProcessor::setStateInformation (const void* data, int sizeI
     autoTranscribe = (bool) state.getProperty (autoId, true);
     capture.armed = (bool) state.getProperty (armedId, true);
     exportOffsetSeconds = (double) state.getProperty (offsetId, 0.0);
+    compactView = (bool) state.getProperty (compactId, false);
+    compactWidth = (int) state.getProperty (compactWId, 760);
+    compactHeight = (int) state.getProperty (compactHId, 150);
 
     setSubtitles (Subtitles::fromValueTree (state.getChildWithName ("Subtitles")));
 

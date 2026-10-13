@@ -163,13 +163,63 @@ WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
                                                                       audioProcessor.exportOffsetSeconds.load()));
     };
 
+    addAndMakeVisible (collapseButton);
+    collapseButton.setTooltip ("Shrink to a subtitle screen you can move and resize anywhere");
+    collapseButton.onClick = [this] { setCompact (true); };
+
+    // Everything added so far belongs to the full editor; the subtitle screen hides it.
+    for (auto* child : getChildren())
+        fullViewComponents.push_back (child);
+
+    addChildComponent (expandButton);
+    expandButton.setAlpha (0.55f);
+    expandButton.setTooltip ("Back to the full editor (or double-click the subtitles)");
+    expandButton.onClick = [this] { setCompact (false); };
+
     setResizable (true, true);
-    setResizeLimits (760, 560, 2000, 1600);
-    setSize (920, 660);
+    setCompact (audioProcessor.compactView.load());
 
     updateEditButtons();
     timerCallback();
-    startTimerHz (15);
+    startTimerHz (30);
+}
+
+void WhisperSubtitlesEditor::setCompact (bool shouldBeCompact)
+{
+    if (shouldBeCompact && ! compact && getWidth() > 0)
+    {
+        fullWidth = getWidth();
+        fullHeight = getHeight();
+    }
+
+    compact = shouldBeCompact;
+    audioProcessor.compactView = compact;
+
+    for (auto* c : fullViewComponents)
+        c->setVisible (! compact);
+
+    expandButton.setVisible (compact);
+
+    if (compact)
+    {
+        // read first: changing the limits can trigger resized(), which overwrites the stored size
+        const int w = audioProcessor.compactWidth.load(), h = audioProcessor.compactHeight.load();
+        setResizeLimits (240, 60, 4000, 1200);
+        setSize (w, h);
+    }
+    else
+    {
+        setResizeLimits (760, 560, 2000, 1600);
+        setSize (fullWidth, fullHeight);
+    }
+
+    repaint();
+}
+
+void WhisperSubtitlesEditor::mouseDoubleClick (const juce::MouseEvent&)
+{
+    if (compact)
+        setCompact (false);
 }
 
 WhisperSubtitlesEditor::~WhisperSubtitlesEditor()
@@ -178,8 +228,40 @@ WhisperSubtitlesEditor::~WhisperSubtitlesEditor()
 }
 
 //==============================================================================
+void WhisperSubtitlesEditor::paintSubtitleScreen (juce::Graphics& g)
+{
+    g.fillAll (juce::Colours::black);
+
+    const auto bounds = getLocalBounds();
+
+    // small, dim timecode so you can tell it's following the playhead
+    g.setColour (juce::Colours::white.withAlpha (0.3f));
+    g.setFont (juce::FontOptions (11.0f));
+    g.drawText (Subtitles::formatTimestamp (audioProcessor.getPlayheadSeconds(), '.'),
+                bounds.reduced (8, 4), juce::Justification::topLeft);
+
+    if (previewText.isEmpty())
+        return;
+
+    // Text scales with the window: drag the corner to make it as big as you like.
+    const auto textArea = bounds.reduced (juce::jmax (12, bounds.getWidth() / 30), 6).withTrimmedTop (16);
+    const float fontSize = juce::jlimit (12.0f, 96.0f, (float) textArea.getHeight() / 2.6f); // room for 2 lines
+
+    g.setFont (juce::FontOptions (fontSize, juce::Font::bold));
+    g.setColour (juce::Colours::black.withAlpha (0.8f));
+    g.drawFittedText (previewText, textArea.translated (2, 2), juce::Justification::centred, 3, 0.85f);
+    g.setColour (juce::Colours::white);
+    g.drawFittedText (previewText, textArea, juce::Justification::centred, 3, 0.85f);
+}
+
 void WhisperSubtitlesEditor::paint (juce::Graphics& g)
 {
+    if (compact)
+    {
+        paintSubtitleScreen (g);
+        return;
+    }
+
     g.fillAll (background);
 
     g.setColour (panel);
@@ -201,12 +283,23 @@ void WhisperSubtitlesEditor::paint (juce::Graphics& g)
 
 void WhisperSubtitlesEditor::resized()
 {
+    expandButton.setBounds (getWidth() - 70, 4, 64, 20);
+
+    if (compact)
+    {
+        audioProcessor.compactWidth = getWidth();
+        audioProcessor.compactHeight = getHeight();
+        return;
+    }
+
     auto area = getLocalBounds().reduced (16);
     const int rowH = 26, gap = 8;
 
     auto row = area.removeFromTop (rowH);
     loadModelButton.setBounds (row.removeFromLeft (170));
     row.removeFromLeft (gap);
+    collapseButton.setBounds (row.removeFromRight (120));
+    row.removeFromRight (gap);
     modelLabel.setBounds (row);
     area.removeFromTop (gap);
 
@@ -314,7 +407,11 @@ void WhisperSubtitlesEditor::timerCallback()
     if (now != previewText || audioProcessor.isHostPlaying())
     {
         previewText = now;
-        repaint (previewArea);
+
+        if (compact)
+            repaint();
+        else
+            repaint (previewArea);
     }
 }
 
