@@ -4,6 +4,7 @@
 //   WhisperSubtitlesTest [path/to/ggml-model.bin] [path/to/speech.wav]
 
 #include "PluginProcessor.h"
+#include "ARASupport.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <cmath>
@@ -121,6 +122,19 @@ int main (int argc, char* argv[])
 
         check (Subtitles::formatTimestamp (3723.4567, ',') == "01:02:03,457", "timestamp HH:MM:SS,mmm");
 
+        // ARA: a clip that plays 10..20 s of its file at timeline 100..110 s
+        SubtitleList fileCues { { 1, 3, "before clip" }, { 9, 12, "straddles start" }, { 15, 16, "inside" }, { 19.5, 25, "straddles end" } };
+        auto placed = Subtitles::mapSourceToTimeline (fileCues, 10.0, 20.0, 100.0, 110.0);
+        check (placed.size() == 3
+                 && std::abs (placed[0].start - 100.0) < 1e-9 && std::abs (placed[0].end - 102.0) < 1e-9
+                 && std::abs (placed[1].start - 105.0) < 1e-9 && placed[1].text == "inside"
+                 && std::abs (placed[2].end - 110.0) < 1e-9,
+               "ARA clip cues are trimmed to the clip and moved to its timeline position");
+
+        auto stretched = Subtitles::mapSourceToTimeline ({ { 15, 16, "x" } }, 10.0, 20.0, 100.0, 120.0);
+        check (stretched.size() == 1 && std::abs (stretched[0].start - 110.0) < 1e-9 && std::abs (stretched[0].end - 112.0) < 1e-9,
+               "a time-stretched clip scales cue times");
+
         SubtitleList target { { 0, 2, "keep" }, { 10, 12, "old take" }, { 20, 22, "keep too" } };
         Subtitles::replaceRange (target, 9, 15, { { 9.5, 11, "new take" } });
         check (target.size() == 3 && target[1].text == "new take", "re-transcribing a range replaces old cues");
@@ -156,6 +170,35 @@ int main (int argc, char* argv[])
         const auto j = (size_t) p;
         const float a = speech16k[j], b = speech16k[std::min (j + 1, speech16k.size() - 1)];
         speech48k[i] = a + (b - a) * (float) (p - (double) j);
+    }
+
+    // ARA reads whole files: check a 48 kHz stereo file comes out as the same 16 kHz mono speech
+    {
+        juce::MemoryBlock wavData;
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::MemoryOutputStream> (wavData, false);
+            auto writer = wav.createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (hostRate)
+                                                                                         .withNumChannels (2)
+                                                                                         .withBitsPerSample (24));
+            juce::AudioBuffer<float> stereo (2, (int) speech48k.size());
+            stereo.copyFrom (0, 0, speech48k.data(), (int) speech48k.size());
+            stereo.copyFrom (1, 0, speech48k.data(), (int) speech48k.size());
+            writer->writeFromAudioSampleBuffer (stereo, 0, stereo.getNumSamples());
+        } // writer finalises the WAV header when destroyed
+
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (new juce::MemoryInputStream (wavData, false), true));
+        const auto audio = ARASubtitles::readForWhisper (*reader);
+
+        check (std::abs ((double) audio.size() - (double) speech16k.size()) < 4,
+               "ARA file reader: 48 kHz stereo -> 16 kHz mono length (" + juce::String ((int) audio.size()) + " samples)");
+
+        double best = 0;
+        const auto n = std::min (audio.size(), speech16k.size()) - 32;
+        for (int lag = 0; lag < 6; ++lag)
+            best = std::max (best, correlation (audio.data() + lag, speech16k.data(), n - (size_t) lag));
+        check (best > 0.95, "ARA file reader: audio matches the source (corr " + juce::String (best, 4) + ")");
     }
 
     WhisperSubtitlesProcessor proc;
@@ -241,10 +284,10 @@ int main (int argc, char* argv[])
 
     std::cout << "Whisper transcription (" << modelFile.getFileName() << ")" << std::endl;
     proc.setModelFile (modelFile);
-    check (waitFor ([&] { return proc.transcriber.isModelLoaded(); }, 60000), "model loads");
+    check (waitFor ([&] { return proc.transcriber->isModelLoaded(); }, 60000), "model loads");
 
     proc.transcribeCaptured (false);
-    check (waitFor ([&] { return ! proc.transcriber.isBusy() && ! proc.getSubtitles().empty(); }, 300000),
+    check (waitFor ([&] { return ! proc.transcriber->isBusy() && ! proc.getSubtitles().empty(); }, 300000),
            "transcription finishes");
 
     const auto subs = proc.getSubtitles();

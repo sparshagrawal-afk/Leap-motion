@@ -35,6 +35,13 @@ namespace Subtitles
     /** Replaces every cue that overlaps [rangeStart, rangeEnd] with the new cues. */
     void replaceRange (SubtitleList& target, double rangeStart, double rangeEnd, const SubtitleList& replacement);
 
+    /** Places cues timed against an audio file onto the timeline, for a clip that plays
+        [sourceStart, sourceEnd] of that file at [timelineStart, timelineEnd].
+        Cues are trimmed to the clip; a stretched clip scales the times. */
+    SubtitleList mapSourceToTimeline (const SubtitleList& sourceCues,
+                                      double sourceStart, double sourceEnd,
+                                      double timelineStart, double timelineEnd);
+
     /** Returns the cue showing at the given time, or nullptr. */
     const SubtitleSegment* findAt (const SubtitleList&, double seconds);
 

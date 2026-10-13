@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Resampler.h"
+
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <atomic>
 #include <functional>
@@ -76,9 +78,7 @@ private:
 
     // --- capture thread
     std::vector<float> scratch;
-    juce::IIRFilter antiAlias;
-    double resamplePhase = 0.0;
-    float previousSample = 0.0f;
+    WhisperResampler resampler;
     juce::int64 expectedNextSample = -1;
 
     // --- shared

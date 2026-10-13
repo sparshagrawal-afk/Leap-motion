@@ -40,9 +40,7 @@ void AudioCapture::prepare (double hostSampleRate, int maximumBlockSize)
     infoFifo.reset();
 
     scratch.assign ((size_t) fifoSize, 0.0f);
-    antiAlias.setCoefficients (juce::IIRCoefficients::makeLowPass (hostSampleRate,
-                                                                   juce::jmin (7000.0, hostSampleRate * 0.45)));
-    antiAlias.reset();
+    resampler.prepare (hostSampleRate);
     wasCapturing = false;
     expectedNextSample = -1;
 
@@ -185,33 +183,12 @@ void AudioCapture::handleBlock (const BlockInfo& info, float* data)
         hasCurrent = true;
         recording = true;
 
-        antiAlias.reset();
-        resamplePhase = 0.0;
-        previousSample = 0.0f;
+        resampler.reset();
     }
 
     expectedNextSample = info.timelineSample + info.numSamples;
 
-    // Low-pass then linearly resample to 16 kHz.
-    auto* filtered = data;
-    antiAlias.processSamples (filtered, info.numSamples);
-
-    const double step = rate / whisperSampleRate;
-    const int n = info.numSamples;
-
-    // Virtual input y[0] = previousSample, y[k + 1] = filtered[k]
-    while (resamplePhase < (double) n)
-    {
-        const int i = (int) resamplePhase;
-        const float frac = (float) (resamplePhase - (double) i);
-        const float a = i == 0 ? previousSample : filtered[i - 1];
-        const float b = filtered[i];
-        current.samples.push_back (a + (b - a) * frac);
-        resamplePhase += step;
-    }
-
-    resamplePhase -= (double) n;
-    previousSample = filtered[n - 1];
+    resampler.process (data, info.numSamples, current.samples);
 }
 
 void AudioCapture::finishCurrentRegion()

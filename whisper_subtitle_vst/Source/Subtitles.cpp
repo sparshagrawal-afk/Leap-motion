@@ -170,6 +170,34 @@ void replaceRange (SubtitleList& target, double rangeStart, double rangeEnd, con
                       [] (const SubtitleSegment& a, const SubtitleSegment& b) { return a.start < b.start; });
 }
 
+SubtitleList mapSourceToTimeline (const SubtitleList& sourceCues,
+                                  double sourceStart, double sourceEnd,
+                                  double timelineStart, double timelineEnd)
+{
+    SubtitleList result;
+
+    const double sourceLength = sourceEnd - sourceStart;
+    if (sourceLength <= 0.0)
+        return result;
+
+    const double scale = (timelineEnd - timelineStart) / sourceLength;
+
+    for (auto& cue : sourceCues)
+    {
+        const double s = juce::jmax (cue.start, sourceStart);
+        const double e = juce::jmin (cue.end, sourceEnd);
+
+        if (e - s < 0.05) // outside the clip, or only a sliver of it left
+            continue;
+
+        result.push_back ({ timelineStart + (s - sourceStart) * scale,
+                            timelineStart + (e - sourceStart) * scale,
+                            cue.text });
+    }
+
+    return result;
+}
+
 const SubtitleSegment* findAt (const SubtitleList& list, double seconds)
 {
     for (auto& s : list)

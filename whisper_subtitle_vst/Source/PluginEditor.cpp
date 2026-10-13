@@ -39,7 +39,11 @@ namespace
 }
 
 WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p)
+    : AudioProcessorEditor (&p),
+     #if JucePlugin_Enable_ARA
+      AudioProcessorEditorARAExtension (&p),
+     #endif
+      audioProcessor (p)
 {
     const auto settings = audioProcessor.getSettings();
 
@@ -102,7 +106,7 @@ WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
     addAndMakeVisible (retranscribeButton);
     retranscribeButton.onClick = [this] { audioProcessor.transcribeCaptured (true); };
     addAndMakeVisible (cancelButton);
-    cancelButton.onClick = [this] { audioProcessor.transcriber.cancelAll(); };
+    cancelButton.onClick = [this] { audioProcessor.transcriber->cancelAll(); };
     addAndMakeVisible (clearAudioButton);
     clearAudioButton.onClick = [this] { audioProcessor.capture.clear(); };
     addAndMakeVisible (clearSubsButton);
@@ -365,10 +369,14 @@ void WhisperSubtitlesEditor::resized()
 //==============================================================================
 void WhisperSubtitlesEditor::timerCallback()
 {
-    auto& t = audioProcessor.transcriber;
+    auto& t = *audioProcessor.transcriber;
     auto& c = audioProcessor.capture;
 
-    const auto model = audioProcessor.getModelFile();
+    // the engine is shared between instances, so show the model it actually has
+    auto model = t.getModelFile();
+    if (model == juce::File())
+        model = audioProcessor.getModelFile();
+
     const auto warning = modelWarning (model.getFileName(), audioProcessor.getSettings());
     modelLabel.setText (t.isModelLoaded() ? "Model: " + model.getFileName() + (warning.isEmpty() ? "" : "  -  " + warning)
                                           : (model == juce::File() ? "No model loaded - pick a ggml-*.bin file"
@@ -377,14 +385,28 @@ void WhisperSubtitlesEditor::timerCallback()
     modelLabel.setColour (juce::Label::textColourId, t.isModelLoaded() && warning.isEmpty() ? juce::Colours::lightgreen
                                                                                             : juce::Colours::orange);
 
-    juce::String captureText;
-    captureText << (c.isRecording() ? juce::String::charToString (0x25cf) + " Recording   " : juce::String())
-                << "Captured " << juce::String (c.getCapturedSeconds(), 1) << " s";
-    if (c.getDroppedBlocks() > 0)
-        captureText << "  (" << c.getDroppedBlocks() << " blocks dropped)";
-    captureLabel.setText (captureText, juce::dontSendNotification);
-    captureLabel.setColour (juce::Label::textColourId, c.isRecording() ? juce::Colours::tomato
-                                                                       : juce::Colours::lightgrey);
+    if (audioProcessor.isUsingARA())
+    {
+        // ARA: the host hands us whole clips, so there's nothing to record
+        captureLabel.setText (audioProcessor.getARAStatus(), juce::dontSendNotification);
+        captureLabel.setColour (juce::Label::textColourId, juce::Colours::lightgrey);
+        armedToggle.setEnabled (false);
+        clearAudioButton.setEnabled (false);
+        transcribeButton.setButtonText ("Transcribe new clips");
+        retranscribeButton.setButtonText ("Re-transcribe all");
+        autoToggle.setButtonText ("Auto-transcribe clips as they're added");
+    }
+    else
+    {
+        juce::String captureText;
+        captureText << (c.isRecording() ? juce::String::charToString (0x25cf) + " Recording   " : juce::String())
+                    << "Captured " << juce::String (c.getCapturedSeconds(), 1) << " s";
+        if (c.getDroppedBlocks() > 0)
+            captureText << "  (" << c.getDroppedBlocks() << " blocks dropped)";
+        captureLabel.setText (captureText, juce::dontSendNotification);
+        captureLabel.setColour (juce::Label::textColourId, c.isRecording() ? juce::Colours::tomato
+                                                                           : juce::Colours::lightgrey);
+    }
 
     juce::String status = t.getStatus();
     if (t.getPendingJobs() > 1)

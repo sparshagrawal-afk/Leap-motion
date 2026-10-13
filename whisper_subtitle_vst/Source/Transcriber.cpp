@@ -32,6 +32,12 @@ namespace
     void silentLog (enum ggml_log_level, const char*, void*) {}
 }
 
+juce::String Transcriber::settingsKey (const Settings& s)
+{
+    return s.language + "|" + (s.translateToEnglish ? "en" : "-") + "|" + juce::String (s.maxCharsPerCue)
+         + "|" + (s.dropNonSpeech ? "d" : "-") + "|" + s.prompt.trim();
+}
+
 Transcriber::Transcriber() : juce::Thread ("Whisper transcriber")
 {
     whisper_log_set (silentLog, nullptr);
@@ -100,9 +106,24 @@ juce::String Transcriber::getStatus() const
     return status;
 }
 
+juce::File Transcriber::getModelFile() const
+{
+    const juce::ScopedLock sl (statusLock);
+    return requestedModel;
+}
+
 //==============================================================================
 void Transcriber::loadModel (const juce::File& modelFile)
 {
+    {
+        const juce::ScopedLock sl (statusLock);
+
+        if (modelFile == requestedModel)
+            return; // already loaded or loading (several plugin instances share one engine)
+
+        requestedModel = modelFile;
+    }
+
     post ([this, modelFile]
     {
         setStatus ("Loading " + modelFile.getFileName() + "...");
@@ -117,6 +138,11 @@ void Transcriber::loadModel (const juce::File& modelFile)
 
         if (! modelFile.existsAsFile())
         {
+            {
+                const juce::ScopedLock sl (statusLock);
+                requestedModel = juce::File();
+            }
+
             setStatus ("Model not found: " + modelFile.getFullPathName());
             busy = false;
             return;
@@ -136,25 +162,49 @@ void Transcriber::loadModel (const juce::File& modelFile)
         }
 
         modelLoaded = ctx != nullptr;
+
+        if (! modelLoaded)
+        {
+            const juce::ScopedLock sl (statusLock);
+            requestedModel = juce::File();
+        }
+
         setStatus (modelLoaded ? "Model ready: " + modelFile.getFileName()
                                : "Could not load " + modelFile.getFileName() + " (is it a ggml Whisper model?)");
         busy = false;
     });
 }
 
-void Transcriber::transcribe (double startSeconds, std::vector<float> audio16k, const Settings& settings)
+void Transcriber::transcribe (double startSeconds, std::vector<float> audio16k,
+                              const Settings& settings, ResultCallback onDone)
+{
+    auto shared = std::make_shared<std::vector<float>> (std::move (audio16k));
+    transcribe (startSeconds, [shared] { return std::move (*shared); }, settings, std::move (onDone));
+}
+
+void Transcriber::transcribe (double startSeconds, AudioProvider provider,
+                              const Settings& settings, ResultCallback onDone)
 {
     ++pendingJobs;
 
-    post ([this, startSeconds, audio = std::move (audio16k), settings]
+    post ([this, startSeconds, provider = std::move (provider), settings, onDone = std::move (onDone)]
     {
+        Result result;
+
         if (! cancelRequested)
-            runTranscription (startSeconds, audio, settings);
+        {
+            setStatus ("Reading audio...");
+            const auto audio = provider();
+            result = runTranscription (startSeconds, audio, settings);
+        }
 
         --pendingJobs;
 
         if (pendingJobs.load() == 0)
             cancelRequested = false;
+
+        if (onDone)
+            onDone (result.ok, startSeconds, result.endSeconds, std::move (result.cues));
     });
 }
 
@@ -165,16 +215,20 @@ void Transcriber::cancelAll()
 }
 
 //==============================================================================
-void Transcriber::runTranscription (double startSeconds, const std::vector<float>& audio, const Settings& settings)
+Transcriber::Result Transcriber::runTranscription (double startSeconds, const std::vector<float>& audio,
+                                                  const Settings& settings)
 {
     if (ctx == nullptr)
     {
         setStatus ("Load a Whisper model first");
-        return;
+        return {};
     }
 
     if (audio.empty())
-        return;
+    {
+        setStatus ("No audio to transcribe (the host may not allow reading it yet)");
+        return {};
+    }
 
     const double lengthSeconds = (double) audio.size() / 16000.0;
 
@@ -231,7 +285,7 @@ void Transcriber::runTranscription (double startSeconds, const std::vector<float
     {
         setStatus (cancelRequested ? "Cancelled" : "Transcription failed (code " + juce::String (rc) + ")");
         busy = false;
-        return;
+        return {};
     }
 
     SubtitleList cues;
@@ -257,8 +311,6 @@ void Transcriber::runTranscription (double startSeconds, const std::vector<float
     setStatus ("Transcribed " + juce::String ((int) cues.size()) + " cues from "
                + Subtitles::formatTimestamp (startSeconds, '.'));
 
-    if (onResult)
-        onResult (startSeconds, startSeconds + lengthSeconds, std::move (cues));
-
     busy = false;
+    return { true, startSeconds + lengthSeconds, std::move (cues) };
 }

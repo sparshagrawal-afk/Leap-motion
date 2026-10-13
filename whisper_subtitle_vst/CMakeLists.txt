@@ -44,49 +44,87 @@ FetchContent_Declare(whisper
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(whisper)
 
-# ---- Plugin -----------------------------------------------------------------
-set(PLUGIN_FORMATS VST3 Standalone)
-if(APPLE)
-    list(APPEND PLUGIN_FORMATS AU)
+# ---- ARA SDK (for the ARA version) -----------------------------------------
+option(WHISPER_SUBTITLES_ARA "Also build 'Whisper Subtitles ARA' (reads clips directly, no playback needed)" ON)
+
+if(WHISPER_SUBTITLES_ARA)
+    FetchContent_Declare(ara_sdk
+        GIT_REPOSITORY https://github.com/Celemony/ARA_SDK.git
+        GIT_TAG        releases/2.3.0
+        GIT_SHALLOW    TRUE
+        GIT_SUBMODULES_RECURSE TRUE
+        SOURCE_SUBDIR  headers-only) # don't build the SDK's examples
+    FetchContent_MakeAvailable(ara_sdk)
+    juce_set_ara_sdk_path("${ara_sdk_SOURCE_DIR}")
 endif()
 
-juce_add_plugin(WhisperSubtitles
-    COMPANY_NAME            "LeapMotion"
-    PLUGIN_MANUFACTURER_CODE Lmtn
-    PLUGIN_CODE             Wsub
-    PRODUCT_NAME            "Whisper Subtitles"
-    FORMATS                 ${PLUGIN_FORMATS}
-    IS_SYNTH                FALSE
-    NEEDS_MIDI_INPUT        FALSE
-    NEEDS_MIDI_OUTPUT       FALSE
-    IS_MIDI_EFFECT          FALSE
-    EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    COPY_PLUGIN_AFTER_BUILD FALSE
-    VST3_CATEGORIES         Fx Analyzer
-    AU_MAIN_TYPE            kAudioUnitType_Effect)
+# ---- Plugins ----------------------------------------------------------------
+function(whisper_subtitles_plugin target)
+    cmake_parse_arguments(ARG "" "PLUGIN_CODE;PRODUCT_NAME;IS_ARA" "FORMATS" ${ARGN})
 
-target_sources(WhisperSubtitles PRIVATE
-    Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp
-    Source/AudioCapture.cpp
-    Source/Transcriber.cpp
-    Source/Subtitles.cpp)
+    juce_add_plugin(${target}
+        COMPANY_NAME            "LeapMotion"
+        COMPANY_WEBSITE         "https://github.com/sparshagrawal-afk/Leap-motion"
+        PLUGIN_MANUFACTURER_CODE Lmtn
+        PLUGIN_CODE             ${ARG_PLUGIN_CODE}
+        PRODUCT_NAME            "${ARG_PRODUCT_NAME}"
+        FORMATS                 ${ARG_FORMATS}
+        IS_ARA_EFFECT           ${ARG_IS_ARA}
+        IS_SYNTH                FALSE
+        NEEDS_MIDI_INPUT        FALSE
+        NEEDS_MIDI_OUTPUT       FALSE
+        IS_MIDI_EFFECT          FALSE
+        EDITOR_WANTS_KEYBOARD_FOCUS TRUE
+        COPY_PLUGIN_AFTER_BUILD FALSE
+        VST3_CATEGORIES         Fx Analyzer
+        AU_MAIN_TYPE            kAudioUnitType_Effect)
 
-target_compile_definitions(WhisperSubtitles PUBLIC
-    JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0
-    JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0)
+    target_sources(${target} PRIVATE
+        Source/PluginProcessor.cpp
+        Source/PluginEditor.cpp
+        Source/AudioCapture.cpp
+        Source/Transcriber.cpp
+        Source/Subtitles.cpp
+        Source/ARASupport.cpp)
 
-target_link_libraries(WhisperSubtitles
-    PRIVATE
-        whisper
-        juce::juce_audio_utils
-        juce::juce_dsp
-    PUBLIC
-        juce::juce_recommended_config_flags
-        juce::juce_recommended_lto_flags
-        juce::juce_recommended_warning_flags)
+    target_compile_definitions(${target} PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0)
+
+    target_link_libraries(${target}
+        PRIVATE
+            whisper
+            juce::juce_audio_utils
+            juce::juce_dsp
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_lto_flags
+            juce::juce_recommended_warning_flags)
+endfunction()
+
+set(PLUGIN_FORMATS VST3 Standalone)
+set(ARA_FORMATS VST3)
+if(APPLE)
+    list(APPEND PLUGIN_FORMATS AU)
+    list(APPEND ARA_FORMATS AU)
+endif()
+
+# Classic version: listens to the track while the DAW plays.
+whisper_subtitles_plugin(WhisperSubtitles
+    PLUGIN_CODE  Wsub
+    PRODUCT_NAME "Whisper Subtitles"
+    IS_ARA       FALSE
+    FORMATS      ${PLUGIN_FORMATS})
+
+# ARA version: the host hands over whole clips, so subtitles appear without playing.
+if(WHISPER_SUBTITLES_ARA)
+    whisper_subtitles_plugin(WhisperSubtitlesARA
+        PLUGIN_CODE  Wsua
+        PRODUCT_NAME "Whisper Subtitles ARA"
+        IS_ARA       TRUE
+        FORMATS      ${ARA_FORMATS})
+endif()
 
 # ---- Headless end-to-end test ----------------------------------------------
 option(WHISPER_SUBTITLES_TESTS "Build the headless end-to-end test" OFF)

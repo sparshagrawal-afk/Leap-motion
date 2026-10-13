@@ -6,6 +6,9 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 class WhisperSubtitlesEditor : public juce::AudioProcessorEditor,
+                              #if JucePlugin_Enable_ARA
+                               public juce::AudioProcessorEditorARAExtension,
+                              #endif
                                private juce::Timer
 {
 public:
@@ -15,6 +18,10 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
+
+   #if JucePlugin_Enable_ARA
+    juce::AudioProcessorEditorARAExtension* getARAClientExtensions() override { return this; }
+   #endif
 
 private:
     void timerCallback() override;

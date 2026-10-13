@@ -10,6 +10,17 @@ subtitles, which you can then export as **.srt** or **.vtt**.
 - Everything runs on your machine. Nothing is uploaded.
 - Subtitles and settings are saved with your DAW project.
 
+It comes in two versions, built from the same code:
+
+| | **Whisper Subtitles** | **Whisper Subtitles ARA** |
+|---|---|---|
+| How it gets the audio | listens while the DAW plays | the DAW hands it the whole clips (ARA) |
+| Need to play the dialogue? | yes, once | **no**: subtitles appear as soon as clips are on the track |
+| Clips moved or trimmed | play that part again | subtitles follow automatically |
+| Works in | any DAW (VST3 / AU) | ARA hosts: Logic Pro, Studio One, Cubase/Nuendo, Reaper, Cakewalk |
+
+Several plugin instances share one Whisper engine, so a large model only loads into memory once.
+
 ## How to use it
 
 1. **Insert** *Whisper Subtitles* on the dialogue track (or on a dialogue bus/stem).
@@ -38,6 +49,25 @@ Tips
   Set it to 0 to keep Whisper's natural sentence segments.
 - **Translate to English** turns foreign-language dialogue into English subtitles (see below).
 - Turn off **Capture while playing** to stop recording without removing the plugin.
+
+## The ARA version
+
+1. Insert **Whisper Subtitles ARA** on the dialogue track. In **Logic Pro** it must be in the
+   **first Audio FX slot**; that's where Logic enables ARA.
+2. Load the model and pick the language / translation as usual.
+3. That's it: with *Auto-transcribe clips as they're added* ticked, every clip on the track is
+   transcribed in the background. You don't need to play anything. The status line shows
+   e.g. `ARA: 4 clips, 2 transcribed, 1 in progress`.
+4. Move, trim or duplicate clips and the subtitles move with them. Each audio file is only
+   transcribed once, even if it's used in several places.
+5. **Transcribe new clips** picks up clips that weren't done yet. **Re-transcribe all** redoes
+   every clip with the current settings, e.g. after changing language.
+
+Notes
+- In ARA mode the plugin plays the clips back itself, so it sounds exactly like the clips.
+  It doesn't process anything that comes before it in the channel strip.
+- Text you edit in the SRT box stays until clips change or are re-transcribed. Export after editing.
+- The transcriptions are stored in the DAW project, so reopening a project doesn't redo them.
 
 ## Malayalam, Bengali, Punjabi → English subtitles
 
@@ -82,7 +112,7 @@ for other languages or for translation.
 ## Building
 
 Requirements: CMake ≥ 3.22, a C++17 compiler (Xcode, Visual Studio 2022, or GCC/Clang), and git.
-JUCE 8 and whisper.cpp are downloaded automatically during configure.
+JUCE 8, whisper.cpp and the ARA SDK are downloaded automatically during configure.
 
 ```bash
 cd whisper_subtitle_vst
@@ -98,6 +128,9 @@ Output: `build/WhisperSubtitles_artefacts/Release/`
 - `AU/Whisper Subtitles.component` (macOS) → `~/Library/Audio/Plug-Ins/Components/`
 - `Standalone/`: a standalone app that transcribes your audio input (handy for testing).
 
+The ARA version is in `build/WhisperSubtitlesARA_artefacts/Release/` (`VST3/` and `AU/`) and
+installs to the same folders. Add `-DWHISPER_SUBTITLES_ARA=OFF` to skip it.
+
 Options
 - `-DWHISPER_NATIVE=ON` tunes whisper.cpp for *your* CPU (faster, but the binary is not portable).
 - On Apple Silicon, whisper.cpp uses Metal automatically.
@@ -111,6 +144,9 @@ cmake -B build -DWHISPER_SUBTITLES_TESTS=ON && cmake --build build --target Whis
 ./build/WhisperSubtitlesTest_artefacts/Release/WhisperSubtitlesTest                       # capture + format tests
 ./build/WhisperSubtitlesTest_artefacts/Release/WhisperSubtitlesTest models/ggml-base.en.bin  # + real transcription
 ```
+
+The ARA version was also run through Celemony's ARA SDK test host (`ARATestHost`). Its tests
+cover model updates, archiving, drag and drop, editor views and playback rendering.
 
 The test acts as a DAW: it drives a fake transport at 48 kHz and plays a speech clip at
 `01:00:12.5`. It then checks capture, timeline alignment, playhead jumps, arming, session
@@ -132,5 +168,10 @@ DAW audio ──► processBlock ──(lock-free FIFO, mono)──► capture t
 The audio thread never locks or allocates. During an offline bounce it waits for the capture
 thread instead of dropping audio.
 
-Source layout: `Source/AudioCapture.*` (timeline-aligned capture), `Source/Transcriber.*`
-(whisper.cpp), `Source/Subtitles.*` (SRT/VTT), `Source/PluginProcessor.*`, `Source/PluginEditor.*`.
+In ARA mode the capture path is skipped: `Source/ARASupport.*` reads each clip's audio file,
+the shared engine transcribes it once per file, and the cues are laid onto the timeline from each
+clip's position, trim and stretch (`Subtitles::mapSourceToTimeline`).
+
+Source layout: `Source/AudioCapture.*` (timeline-aligned capture), `Source/ARASupport.*`
+(ARA document controller, clip playback, file reading), `Source/Transcriber.*` (whisper.cpp),
+`Source/Subtitles.*` (SRT/VTT), `Source/PluginProcessor.*`, `Source/PluginEditor.*`.
