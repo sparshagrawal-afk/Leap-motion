@@ -1,8 +1,15 @@
 cmake_minimum_required(VERSION 3.22)
 
+# Oldest macOS the plugins run on. This must be set before project(); otherwise CMake
+# targets the macOS version of the build machine and older Macs refuse to load the plugin.
+# 12.0 = Monterey, the version the first M1 Pro/Max Macs shipped with.
+if(CMAKE_HOST_APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+endif()
+
 # On Apple Silicon, build arm64 even if CMake guesses x86_64 (e.g. a Rosetta shell),
 # otherwise native DAWs such as Logic won't load the plugin.
-if(APPLE AND NOT CMAKE_OSX_ARCHITECTURES)
+if(CMAKE_HOST_APPLE AND NOT CMAKE_OSX_ARCHITECTURES)
     execute_process(COMMAND sysctl -n hw.optional.arm64
                     OUTPUT_VARIABLE HOST_HAS_ARM64 OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
     if(HOST_HAS_ARM64 STREQUAL "1")
@@ -15,10 +22,6 @@ project(WhisperSubtitles VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-if(APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
-endif()
 
 include(FetchContent)
 

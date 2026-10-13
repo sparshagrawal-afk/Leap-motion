@@ -66,6 +66,7 @@ for arch in "${ARCHS[@]}"; do
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_OSX_ARCHITECTURES="$arch" \
           -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
           -DWHISPER_SUBTITLES_ARA=ON > "$WORK/configure-$arch.log" 2>&1 \
         || { tail -30 "$WORK/configure-$arch.log"; exit 1; }
     cmake --build "$WORK/build-$arch" --config Release -j "$(sysctl -n hw.ncpu)" \
@@ -100,7 +101,8 @@ for entry in "${BUNDLES[@]}"; do
         codesign --force --deep --sign - "$bundle" # ad-hoc: fine for local use
     fi
 
-    echo "  $(basename "$bundle"): $(lipo -archs "$bundle/Contents/MacOS/"* | head -1)"
+    minos="$(vtool -show-build "$bundle/Contents/MacOS/"* 2>/dev/null | awk '/minos/ {print $2; exit}')"
+    echo "  $(basename "$bundle"): $(lipo -archs "$bundle/Contents/MacOS/"* | head -1), runs on macOS ${minos:-?}+"
 done
 
 if [[ $BUNDLE_MODEL -eq 1 ]]; then
@@ -140,6 +142,16 @@ if [ ! -f "\$MODEL_FILE" ] || [ "\$(stat -f%z "\$MODEL_FILE")" -lt 100000000 ]; 
         echo "Model download failed; the plugin's 'Load Whisper model...' button can be used later."
     fi
 fi
+
+# Files from a downloaded installer can inherit the quarantine flag, which makes DAWs
+# report the plugins as "couldn't be opened". Clear it on everything we installed.
+for f in "/Library/Audio/Plug-Ins/Components/Whisper Subtitles.component" \\
+         "/Library/Audio/Plug-Ins/Components/Whisper Subtitles ARA.component" \\
+         "/Library/Audio/Plug-Ins/VST3/Whisper Subtitles.vst3" \\
+         "/Library/Audio/Plug-Ins/VST3/Whisper Subtitles ARA.vst3" \\
+         "/Applications/Whisper Subtitles.app"; do
+    [ -e "\$f" ] && xattr -dr com.apple.quarantine "\$f" 2>/dev/null
+done
 
 # Let every user read the models and add their own.
 chmod -R a+rwX "/Users/Shared/Whisper Subtitles"
