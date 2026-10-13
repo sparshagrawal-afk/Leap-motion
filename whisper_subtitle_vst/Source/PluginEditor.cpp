@@ -5,15 +5,35 @@ namespace
     struct Language { const char* code; const char* name; };
 
     const Language languages[] = {
-        { "auto", "Auto-detect" }, { "en", "English" }, { "es", "Spanish" }, { "fr", "French" },
-        { "de", "German" }, { "it", "Italian" }, { "pt", "Portuguese" }, { "nl", "Dutch" },
-        { "hi", "Hindi" }, { "ru", "Russian" }, { "uk", "Ukrainian" }, { "pl", "Polish" },
-        { "tr", "Turkish" }, { "ar", "Arabic" }, { "he", "Hebrew" }, { "zh", "Chinese" },
-        { "ja", "Japanese" }, { "ko", "Korean" }, { "sv", "Swedish" }, { "da", "Danish" },
-        { "no", "Norwegian" }, { "fi", "Finnish" }, { "el", "Greek" }, { "cs", "Czech" },
-        { "ro", "Romanian" }, { "hu", "Hungarian" }, { "id", "Indonesian" }, { "vi", "Vietnamese" },
-        { "th", "Thai" }, { "ta", "Tamil" }, { "bn", "Bengali" }, { "ur", "Urdu" },
+        { "auto", "Auto-detect" }, { "en", "English" },
+        // Indian languages first: Whisper can transcribe these and translate them to English
+        { "ml", "Malayalam" }, { "bn", "Bengali" }, { "pa", "Punjabi" }, { "hi", "Hindi" },
+        { "ta", "Tamil" }, { "te", "Telugu" }, { "kn", "Kannada" }, { "mr", "Marathi" },
+        { "gu", "Gujarati" }, { "ur", "Urdu" }, { "ne", "Nepali" }, { "si", "Sinhala" },
+        { "es", "Spanish" }, { "fr", "French" }, { "de", "German" }, { "it", "Italian" },
+        { "pt", "Portuguese" }, { "nl", "Dutch" }, { "ru", "Russian" }, { "uk", "Ukrainian" },
+        { "pl", "Polish" }, { "tr", "Turkish" }, { "ar", "Arabic" }, { "he", "Hebrew" },
+        { "zh", "Chinese" }, { "ja", "Japanese" }, { "ko", "Korean" }, { "sv", "Swedish" },
+        { "da", "Danish" }, { "no", "Norwegian" }, { "fi", "Finnish" }, { "el", "Greek" },
+        { "cs", "Czech" }, { "ro", "Romanian" }, { "hu", "Hungarian" }, { "id", "Indonesian" },
+        { "vi", "Vietnamese" }, { "th", "Thai" },
     };
+
+    /** Explains when the loaded model can't do what the settings ask for. */
+    juce::String modelWarning (const juce::String& modelName, const Transcriber::Settings& s)
+    {
+        const auto name = modelName.toLowerCase();
+        const bool englishOnly = name.contains (".en.") || name.endsWith (".en.bin");
+        const bool nonEnglish = s.language != "en" && s.language != "auto";
+
+        if (englishOnly && (s.translateToEnglish || nonEnglish))
+            return "English-only model: load a multilingual one (e.g. ggml-large-v3.bin) to translate";
+
+        if (s.translateToEnglish && name.contains ("turbo"))
+            return "turbo models translate poorly: use ggml-large-v3.bin or ggml-medium.bin";
+
+        return {};
+    }
 
     const juce::Colour background (0xff1b1d22), panel (0xff252830), accent (0xff4fc3f7);
 }
@@ -46,6 +66,8 @@ WhisperSubtitlesEditor::WhisperSubtitlesEditor (WhisperSubtitlesProcessor& p)
     addAndMakeVisible (translateToggle);
     translateToggle.setToggleState (settings.translateToEnglish, juce::dontSendNotification);
     translateToggle.onClick = [this] { pushSettings(); };
+    translateToggle.setTooltip ("Subtitles in English, whatever language is spoken (e.g. Malayalam, Bengali, Punjabi). "
+                                "Needs a multilingual model such as ggml-large-v3.bin.");
 
     addAndMakeVisible (maxCharsLabel);
     addAndMakeVisible (maxCharsSlider);
@@ -254,12 +276,13 @@ void WhisperSubtitlesEditor::timerCallback()
     auto& c = processor.capture;
 
     const auto model = processor.getModelFile();
-    modelLabel.setText (t.isModelLoaded() ? "Model: " + model.getFileName()
+    const auto warning = modelWarning (model.getFileName(), processor.getSettings());
+    modelLabel.setText (t.isModelLoaded() ? "Model: " + model.getFileName() + (warning.isEmpty() ? "" : "  -  " + warning)
                                           : (model == juce::File() ? "No model loaded - pick a ggml-*.bin file"
                                                                    : t.getStatus()),
                         juce::dontSendNotification);
-    modelLabel.setColour (juce::Label::textColourId, t.isModelLoaded() ? juce::Colours::lightgreen
-                                                                        : juce::Colours::orange);
+    modelLabel.setColour (juce::Label::textColourId, t.isModelLoaded() && warning.isEmpty() ? juce::Colours::lightgreen
+                                                                                            : juce::Colours::orange);
 
     juce::String captureText;
     captureText << (c.isRecording() ? juce::String::charToString (0x25cf) + " Recording   " : juce::String())

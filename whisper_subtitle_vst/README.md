@@ -32,8 +32,25 @@ Tips
 - An offline bounce/export of the track also works as a capture pass.
 - **Max chars / cue** splits on word boundaries (42 is a common one-line subtitle width).
   Set it to 0 to keep Whisper's natural sentence segments.
-- **Translate to English** turns foreign-language dialogue into English subtitles.
+- **Translate to English** turns foreign-language dialogue into English subtitles (see below).
 - Turn off **Capture while playing** to stop recording without removing the plugin.
+
+## Malayalam, Bengali, Punjabi → English subtitles
+
+1. Load a **multilingual** model. `ggml-large-v3.bin` gives the best results, and `ggml-medium.bin`
+   is faster. English-only `.en` models can't translate. `large-v3-turbo` was trained without
+   translation data, so it translates poorly. The plugin warns you if the loaded model doesn't fit.
+2. Set **Language** to *Malayalam*, *Bengali* or *Punjabi*. Choosing the language beats
+   Auto-detect on short lines and code-switched dialogue.
+3. Tick **Translate to English**.
+4. Play the track. The cues come out in English, timed to the original dialogue.
+
+For a mixed-language film, put one instance on each language's dialogue track (or region) with
+its own language set. Or use Auto-detect, which picks one language per captured stretch.
+Write character names in **Names / terms** in English spelling so they come out consistently.
+
+These languages have much less Whisper training data than English, so review the translated
+subtitles before delivery. You can fix any line in the SRT box and click **Apply edits**.
 
 ## Models
 
@@ -41,7 +58,8 @@ Download a model with the included script (or grab any `ggml-*.bin` from
 <https://huggingface.co/ggerganov/whisper.cpp>):
 
 ```bash
-./scripts/download-model.sh base.en      # macOS / Linux
+./scripts/download-model.sh large-v3     # for Malayalam/Bengali/Punjabi -> English
+./scripts/download-model.sh base.en      # macOS / Linux, English dialogue
 .\scripts\download-model.ps1 base.en     # Windows PowerShell
 ```
 
@@ -50,7 +68,9 @@ Download a model with the included script (or grab any `ggml-*.bin` from
 | `tiny.en` / `tiny` | 75 MB | fastest, rough |
 | `base.en` / `base` | 142 MB | good default for clean dialogue |
 | `small.en` / `small` | 466 MB | noticeably more accurate |
-| `large-v3-turbo` | 1.5 GB | best quality-to-speed ratio; multilingual |
+| `medium` | 1.5 GB | multilingual; decent translation |
+| `large-v3` | 3.1 GB | best for Malayalam / Bengali / Punjabi and translation |
+| `large-v3-turbo` | 1.6 GB | fast and multilingual, but **transcribe only**: poor at translating |
 
 `.en` models are English-only and a bit more accurate for English. Use a model without `.en`
 for other languages or for translation.

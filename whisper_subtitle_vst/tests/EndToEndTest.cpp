@@ -212,7 +212,8 @@ int main (int argc, char* argv[])
     // State save/restore keeps settings + cues
     {
         auto s = proc.getSettings();
-        s.language = "en";
+        s.language = "ml";              // Malayalam dialogue -> English subtitles
+        s.translateToEnglish = true;
         s.prompt = "Ask not";
         proc.setSettings (s);
         proc.setSubtitles ({ { 1, 2, "hello" } });
@@ -223,7 +224,8 @@ int main (int argc, char* argv[])
         WhisperSubtitlesProcessor restored;
         restored.setStateInformation (state.getData(), (int) state.getSize());
         auto subs = restored.getSubtitles();
-        check (restored.getSettings().language == "en" && restored.getSettings().prompt == "Ask not"
+        check (restored.getSettings().language == "ml" && restored.getSettings().translateToEnglish
+                   && restored.getSettings().prompt == "Ask not"
                    && subs.size() == 1 && subs[0].text == "hello",
                "DAW session state restores settings and subtitles");
         proc.clearSubtitles();
